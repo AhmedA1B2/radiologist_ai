@@ -37,6 +37,7 @@ dependencies:
   tflite_flutter: ^0.12.1
   image: ^4.9.1
   file_picker: ^11.0.2
+  pdf: ^3.13.0
 
 dev_dependencies:
   flutter_test:
