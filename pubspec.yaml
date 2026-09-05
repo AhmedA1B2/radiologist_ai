@@ -38,6 +38,8 @@ dependencies:
   image: ^4.9.1
   file_picker: ^11.0.2
   pdf: ^3.13.0
+  http: ^1.6.0
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:

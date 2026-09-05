@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:radiologist_ai/auth/log_in.dart';
 import 'package:radiologist_ai/core/theme/app_colors.dart';
 import 'package:radiologist_ai/dashboard/main_dashboard.dart';
 
@@ -25,7 +26,8 @@ class MedicalXRayApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Segoe UI', // خط مناسب للويندوز
       ),
-      home: const MainDashboard(),
+      home: const LoginPage(),
+      routes: {"main_dashboard": (context) => const MainDashboard()},
     );
   }
 }
