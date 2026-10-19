@@ -1,14 +1,17 @@
 import 'dart:io';
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:radiologist_ai/ai_processing/diagnostic_result.dart';
 import 'package:radiologist_ai/ai_processing/image_pre_processor.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:radiologist_ai/api/send_diagnosis.dart';
 import 'package:radiologist_ai/body_of_main_view/header.dart';
 import 'package:radiologist_ai/body_of_main_view/models/process_step.dart';
 import 'package:radiologist_ai/body_of_main_view/sidebar.dart';
 import 'package:radiologist_ai/core/theme/app_colors.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
+import 'package:radiologist_ai/customs/custom_dialogue/custom_dialogue.dart';
 
 class MainDashboard extends StatefulWidget {
   const MainDashboard({super.key});
@@ -20,12 +23,31 @@ class MainDashboard extends StatefulWidget {
 class _MainDashboardState extends State<MainDashboard> {
   final AIPipelineService _aiService = AIPipelineService();
 
+  final TextEditingController numController = TextEditingController();
+
   File? _selectedImage;
   ProcessStep _currentStep = ProcessStep.idle;
   String _statusMessage = "بانتظار الصورة...";
 
   DiagnosticResult? _routerResult;
   List<DiagnosticResult>? _finalResults;
+
+  bool showCustomDialogue = false;
+
+  /// يسجل الخطأ في stdout وFlutter Debug Console وسجل dart:developer.
+  void _logDiagnosticError(String stage, Object error, StackTrace stackTrace) {
+    final message = '[$stage] $error';
+    print(message);
+    debugPrint(message);
+    debugPrintStack(stackTrace: stackTrace);
+    developer.log(
+      message,
+      name: 'RadiologistAI.MainDashboard',
+      error: error,
+      stackTrace: stackTrace,
+      level: 1000,
+    );
+  }
 
   @override
   void initState() {
@@ -36,9 +58,9 @@ class _MainDashboardState extends State<MainDashboard> {
   ////////////////$$$$$$$$$$$$$$$PDF$$$$$$$$$$$$$$$$//////////
   ////////////////////////////////////////////////////////////
 
-  Future<void> _saveDiagnosticAsPdf() async {
+  Future<String?> _saveDiagnosticAsPdf() async {
     if (_finalResults == null || _finalResults!.isEmpty) {
-      return;
+      return null;
     }
 
     try {
@@ -408,7 +430,7 @@ class _MainDashboardState extends State<MainDashboard> {
       );
 
       if (outputPath == null) {
-        return;
+        return null;
       }
 
       // =========================================
@@ -419,24 +441,27 @@ class _MainDashboardState extends State<MainDashboard> {
         outputPath = '$outputPath.pdf';
       }
 
-      // حفظ الملف
       final file = File(outputPath);
 
       final pdfBytes = await pdf.save();
 
       await file.writeAsBytes(pdfBytes, flush: true);
 
-      if (!mounted) return;
+      if (!mounted) return null;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('تم حفظ التقرير بنجاح:\n$outputPath')),
       );
+
+      return outputPath;
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return null;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('حدث خطأ أثناء إنشاء التقرير: $e')),
       );
+
+      return null;
     }
   }
 
@@ -458,14 +483,28 @@ class _MainDashboardState extends State<MainDashboard> {
   ////////////////////////////////////////////////////////////
   Future<void> _initializeSystem() async {
     try {
+      print('[AI INIT] بدء تهيئة نموذج التوجيه...');
+      debugPrint('[AI INIT] بدء تهيئة نموذج التوجيه...');
+      developer.log('بدء تهيئة نموذج التوجيه', name: 'RadiologistAI.MainDashboard');
+
       await _aiService.initRouter();
+
+      if (!mounted) return;
       setState(() {
+        _currentStep = ProcessStep.idle;
         _statusMessage = "النظام جاهز (الموجه محمل)";
       });
-    } catch (e) {
+
+      print('[AI INIT] تم تحميل نموذج التوجيه بنجاح.');
+      debugPrint('[AI INIT] تم تحميل نموذج التوجيه بنجاح.');
+    } catch (e, stackTrace) {
+      _logDiagnosticError('AI INIT ERROR', e, stackTrace);
+
+      if (!mounted) return;
       setState(() {
         _currentStep = ProcessStep.error;
-        _statusMessage = "خطأ في تهيئة النظام: $e";
+        _statusMessage =
+            'فشل تهيئة نظام الذكاء الاصطناعي.\nالخطأ: $e\n\nStackTrace:\n$stackTrace';
       });
     }
   }
@@ -526,10 +565,15 @@ class _MainDashboardState extends State<MainDashboard> {
           _currentStep = ProcessStep.complete;
           _statusMessage = "اكتمل التشخيص.";
         });
-      } catch (e) {
+      } catch (e, stackTrace) {
+        // هذا السجل يحدد الخطأ إن حدث أثناء المعالجة أو تشغيل أحد النماذج.
+        _logDiagnosticError('AI ANALYSIS ERROR', e, stackTrace);
+
+        if (!mounted) return;
         setState(() {
           _currentStep = ProcessStep.error;
-          _statusMessage = "حدث خطأ: $e";
+          _statusMessage =
+              'حدث خطأ أثناء تحليل الصورة.\nالخطأ: $e\n\nStackTrace:\n$stackTrace';
         });
       }
     }
@@ -544,53 +588,135 @@ class _MainDashboardState extends State<MainDashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Row(
+      body: Stack(
         children: [
-          // القائمة الجانبية (Sidebar)
-          Sidebar(),
-          /////////////////////
+          Row(
+            children: [
+              // القائمة الجانبية (Sidebar)
+              Sidebar(),
+              /////////////////////
 
-          // المنطقة المركزية (Central Panel)
-          Expanded(
-            flex: 7,
-            child: Container(
-              color: AppColors.navyDark,
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  /////////////////////
-                  Header(),
-                  /////////////////////
-                  const SizedBox(height: 32),
+              // المنطقة المركزية (Central Panel)
+              Expanded(
+                flex: 7,
+                child: Container(
+                  color: AppColors.navyDark,
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      /////////////////////
+                      Header(),
+                      /////////////////////
+                      const SizedBox(height: 32),
 
-                  Expanded(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // منطقة الصورة والتتبع
-                        Expanded(
-                          flex: 1,
-                          child: Column(
-                            children: [
-                              _buildDragDropZone(),
-                              const SizedBox(height: 24),
-                              _buildProgressTracker(),
-                              const SizedBox(height: 24),
-                              _buildFeet(),
-                            ],
-                          ),
+                      Expanded(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // منطقة الصورة والتتبع
+                            Expanded(
+                              flex: 1,
+                              child: Column(
+                                children: [
+                                  _buildDragDropZone(),
+                                  const SizedBox(height: 24),
+                                  _buildProgressTracker(),
+                                  const SizedBox(height: 24),
+                                  _buildFeet(),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 32),
+                            // منطقة النتائج
+                            Expanded(flex: 1, child: _buildResultsPanel()),
+                          ],
                         ),
-                        const SizedBox(width: 32),
-                        // منطقة النتائج
-                        Expanded(flex: 1, child: _buildResultsPanel()),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
+          showCustomDialogue == true
+              ? CustomDialogue(
+                  numController: numController,
+                  iconOk: Icons.check_circle,
+                  onPressediconOk: () async {
+                    // التأكد من وجود صورة
+                    if (_selectedImage == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please select an X-ray image first'),
+                        ),
+                      );
+
+                      return;
+                    }
+
+                    // التأكد من وجود رقم المريض
+                    if (numController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please enter patient ID'),
+                        ),
+                      );
+
+                      return;
+                    }
+
+                    try {
+                      showCustomDialogue = false;
+                      // 1. إنشاء وحفظ PDF
+                      final String? pdfPath = await _saveDiagnosticAsPdf();
+
+                      if (pdfPath == null) {
+                        return;
+                      }
+
+                      // 2. إرسال PDF + صورة الأشعة إلى السيرفر
+                      final success = await SendDiagnosis().addDiagnosi(
+                        context,
+                        numController.text.trim(),
+                        DateTime.now().toString(),
+                        pdfPath,
+                        _selectedImage!.path,
+                      );
+
+                      // 3. إذا نجح الحفظ في قاعدة البيانات
+                      if (success) {
+                        setState(() {
+                          showCustomDialogue = false;
+                          numController.text = "";
+                        });
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('تم حفظ التقرير والبيانات بنجاح'),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      print("Save diagnosis error: $e");
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('حدث خطأ أثناء حفظ التشخيص: $e'),
+                        ),
+                      );
+                    }
+                  },
+
+                  iconNo: Icons.cancel_sharp,
+                  onPressediconNo: () {
+                    setState(() {
+                      showCustomDialogue = false;
+                    });
+                  },
+                  text: "ادخل الرقم الوطني",
+                )
+              : const SizedBox(),
         ],
       ),
     );
@@ -830,11 +956,17 @@ class _MainDashboardState extends State<MainDashboard> {
             ),
 
           if (_currentStep == ProcessStep.error)
-            const Expanded(
+            Expanded(
               child: Center(
-                child: Text(
-                  "فشل التحليل. الرجاء المحاولة مرة أخرى.",
-                  style: TextStyle(color: Colors.redAccent),
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    "فشل التحليل. التفاصيل:\n\n$_statusMessage",
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 13,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -925,7 +1057,12 @@ class _MainDashboardState extends State<MainDashboard> {
             const Divider(color: Colors.white24, height: 32),
             Center(
               child: TextButton(
-                onPressed: _saveDiagnosticAsPdf,
+                onPressed: () {
+                  setState(() {
+                    showCustomDialogue = true;
+                    print("showCustomDialogue => true ");
+                  });
+                },
                 child: Text(
                   "Print",
                   style: TextStyle(

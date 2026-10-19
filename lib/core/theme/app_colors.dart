@@ -7,4 +7,5 @@ class AppColors {
   static const Color cyanAccentDark = Color(0xFF114D58);
   static const Color textPrimary = Color(0xFFF8FAFC);
   static const Color textSecondary = Color(0xFF94A3B8);
+  static const Color red = Color(0xFFFF1E00);
 }

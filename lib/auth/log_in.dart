@@ -14,7 +14,7 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
-  Crud _crud = Crud();
+  final Crud _crud = Crud();
 
   bool obscurePassword = true;
 

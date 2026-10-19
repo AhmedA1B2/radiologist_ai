@@ -57,6 +57,17 @@ class _SidebarState extends State<Sidebar> {
                     onTap: () {
                       setState(() {
                         thisIndex = index;
+                        if (thisIndex == 0) {
+                          Navigator.of(context).pushNamedAndRemoveUntil(
+                            "main_dashboard",
+                            (route) => false,
+                          );
+                        } else if (thisIndex == 4) {
+                          Navigator.of(context).pushNamedAndRemoveUntil(
+                            "view_dashboard",
+                            (route) => false,
+                          );
+                        }
                       });
                     },
                     child: Container(
