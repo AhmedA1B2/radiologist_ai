@@ -3,6 +3,8 @@ import 'package:radiologist_ai/auth/log_in.dart';
 import 'package:radiologist_ai/core/theme/app_colors.dart';
 import 'package:radiologist_ai/dashboard/main_dashboard.dart';
 import 'package:radiologist_ai/dashboard/view_dashboard.dart';
+import 'package:radiologist_ai/pages/about_page.dart';
+import 'package:radiologist_ai/pages/settings_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +33,8 @@ class MedicalXRayApp extends StatelessWidget {
       routes: {
         "main_dashboard": (context) => const MainDashboard(),
         "view_dashboard": (context) => ViewDashboard(),
+        "settings_page" : (context) => SettingsPage(),
+        "about_page"    : (context) => AboutPage(),
       },
     );
   }

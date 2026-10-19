@@ -62,6 +62,16 @@ class _SidebarState extends State<Sidebar> {
                             "main_dashboard",
                             (route) => false,
                           );
+                        } else if (thisIndex == 2) {
+                          Navigator.of(context).pushNamedAndRemoveUntil(
+                            "settings_page",
+                            (route) => false,
+                          );
+                        } else if (thisIndex == 3) {
+                          Navigator.of(context).pushNamedAndRemoveUntil(
+                            "about_page",
+                            (route) => false,
+                          );
                         } else if (thisIndex == 4) {
                           Navigator.of(context).pushNamedAndRemoveUntil(
                             "view_dashboard",

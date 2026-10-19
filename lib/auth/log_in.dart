@@ -94,7 +94,7 @@ class _LoginPageState extends State<LoginPage> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Icon(
-                      Icons.medical_information_outlined,
+                      Icons.badge,
                       size: 38,
                       color: AppColors.cyanAccent,
                     ),
