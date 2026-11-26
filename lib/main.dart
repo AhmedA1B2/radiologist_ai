@@ -33,8 +33,8 @@ class MedicalXRayApp extends StatelessWidget {
       routes: {
         "main_dashboard": (context) => const MainDashboard(),
         "view_dashboard": (context) => ViewDashboard(),
-        "settings_page" : (context) => SettingsPage(),
-        "about_page"    : (context) => AboutPage(),
+        "settings_page": (context) => SettingsPage(),
+        "about_page": (context) => AboutPage(),
       },
     );
   }

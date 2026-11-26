@@ -1,5 +1,7 @@
+
 import 'dart:io';
 import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:radiologist_ai/ai_processing/diagnostic_result.dart';
 import 'package:radiologist_ai/ai_processing/image_pre_processor.dart';
@@ -26,20 +28,34 @@ class _MainDashboardState extends State<MainDashboard> {
   final TextEditingController numController = TextEditingController();
 
   File? _selectedImage;
+
   ProcessStep _currentStep = ProcessStep.idle;
+
   String _statusMessage = "بانتظار الصورة...";
 
   DiagnosticResult? _routerResult;
+
   List<DiagnosticResult>? _finalResults;
 
   bool showCustomDialogue = false;
 
-  /// يسجل الخطأ في stdout وFlutter Debug Console وسجل dart:developer.
-  void _logDiagnosticError(String stage, Object error, StackTrace stackTrace) {
+  // التحقق من كون الصورة غير مدعومة
+  bool get _isUnsupportedImage {
+    return _routerResult?.label.trim().toLowerCase() == 'other';
+  }
+
+  /// تسجيل الأخطاء
+  void _logDiagnosticError(
+    String stage,
+    Object error,
+    StackTrace stackTrace,
+  ) {
     final message = '[$stage] $error';
+
     print(message);
     debugPrint(message);
     debugPrintStack(stackTrace: stackTrace);
+
     developer.log(
       message,
       name: 'RadiologistAI.MainDashboard',
@@ -54,9 +70,10 @@ class _MainDashboardState extends State<MainDashboard> {
     super.initState();
     _initializeSystem();
   }
-  ////////////////////////////////////////////////////////////
-  ////////////////$$$$$$$$$$$$$$$PDF$$$$$$$$$$$$$$$$//////////
-  ////////////////////////////////////////////////////////////
+
+  // ============================================================
+  // PDF REPORT
+  // ============================================================
 
   Future<String?> _saveDiagnosticAsPdf() async {
     if (_finalResults == null || _finalResults!.isEmpty) {
@@ -113,11 +130,8 @@ class _MainDashboardState extends State<MainDashboard> {
                     ),
                   ],
                 ),
-
                 pw.SizedBox(height: 8),
-
                 pw.Divider(color: PdfColors.grey500),
-
                 pw.SizedBox(height: 15),
               ],
             );
@@ -128,7 +142,6 @@ class _MainDashboardState extends State<MainDashboard> {
               children: [
                 pw.Divider(color: PdfColors.grey400),
                 pw.SizedBox(height: 5),
-
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
@@ -139,7 +152,6 @@ class _MainDashboardState extends State<MainDashboard> {
                         color: PdfColors.grey600,
                       ),
                     ),
-
                     pw.Text(
                       'Page ${context.pageNumber} of ${context.pagesCount}',
                       style: const pw.TextStyle(
@@ -154,17 +166,22 @@ class _MainDashboardState extends State<MainDashboard> {
           },
 
           build: (context) => [
-            // عنوان التقرير
             pw.Text(
               'Diagnostic Report',
-              style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+              style: pw.TextStyle(
+                fontSize: 24,
+                fontWeight: pw.FontWeight.bold,
+              ),
             ),
 
             pw.SizedBox(height: 5),
 
             pw.Text(
               'Artificial Intelligence X-Ray Analysis',
-              style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700),
+              style: const pw.TextStyle(
+                fontSize: 11,
+                color: PdfColors.grey700,
+              ),
             ),
 
             pw.SizedBox(height: 20),
@@ -234,13 +251,16 @@ class _MainDashboardState extends State<MainDashboard> {
                   border: pw.Border.all(color: PdfColors.grey400),
                   borderRadius: pw.BorderRadius.circular(8),
                 ),
-                child: pw.Image(xrayImage, fit: pw.BoxFit.contain),
+                child: pw.Image(
+                  xrayImage,
+                  fit: pw.BoxFit.contain,
+                ),
               ),
 
               pw.SizedBox(height: 20),
             ],
 
-            // نوع الأشعة
+            // تصنيف الصورة
             if (_routerResult != null) ...[
               pw.Text(
                 'IMAGE CLASSIFICATION',
@@ -307,7 +327,9 @@ class _MainDashboardState extends State<MainDashboard> {
               },
               children: [
                 pw.TableRow(
-                  decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                  decoration: const pw.BoxDecoration(
+                    color: PdfColors.grey200,
+                  ),
                   children: [
                     _pdfCell('#', bold: true),
                     _pdfCell('Possible Diagnosis', bold: true),
@@ -335,45 +357,44 @@ class _MainDashboardState extends State<MainDashboard> {
             pw.SizedBox(height: 25),
 
             // النتيجة الأعلى
-            if (_finalResults!.isNotEmpty)
-              pw.Container(
-                padding: const pw.EdgeInsets.all(15),
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: PdfColors.cyan800),
-                  borderRadius: pw.BorderRadius.circular(8),
-                ),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      'PRIMARY AI FINDING',
-                      style: pw.TextStyle(
-                        fontSize: 11,
-                        fontWeight: pw.FontWeight.bold,
-                        color: PdfColors.cyan800,
-                      ),
-                    ),
-
-                    pw.SizedBox(height: 8),
-
-                    pw.Text(
-                      _finalResults!.first.label,
-                      style: pw.TextStyle(
-                        fontSize: 18,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-
-                    pw.SizedBox(height: 5),
-
-                    pw.Text(
-                      'AI confidence: '
-                      '${(_finalResults!.first.confidence * 100).toStringAsFixed(1)}%',
-                      style: const pw.TextStyle(fontSize: 10),
-                    ),
-                  ],
-                ),
+            pw.Container(
+              padding: const pw.EdgeInsets.all(15),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.cyan800),
+                borderRadius: pw.BorderRadius.circular(8),
               ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'PRIMARY AI FINDING',
+                    style: pw.TextStyle(
+                      fontSize: 11,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.cyan800,
+                    ),
+                  ),
+
+                  pw.SizedBox(height: 8),
+
+                  pw.Text(
+                    _finalResults!.first.label,
+                    style: pw.TextStyle(
+                      fontSize: 18,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+
+                  pw.SizedBox(height: 5),
+
+                  pw.Text(
+                    'AI confidence: '
+                    '${(_finalResults!.first.confidence * 100).toStringAsFixed(1)}%',
+                    style: const pw.TextStyle(fontSize: 10),
+                  ),
+                ],
+              ),
+            ),
 
             pw.SizedBox(height: 30),
 
@@ -418,10 +439,7 @@ class _MainDashboardState extends State<MainDashboard> {
         ),
       );
 
-      // ==============================
       // اختيار مكان حفظ الملف
-      // ==============================
-
       String? outputPath = await FilePicker.saveFile(
         dialogTitle: 'Save Diagnostic Report',
         fileName: 'diagnostic_report.pdf',
@@ -433,10 +451,7 @@ class _MainDashboardState extends State<MainDashboard> {
         return null;
       }
 
-      // =========================================
-      // إصلاح مشكلة حذف امتداد PDF
-      // =========================================
-
+      // التأكد من امتداد PDF
       if (!outputPath.toLowerCase().endsWith('.pdf')) {
         outputPath = '$outputPath.pdf';
       }
@@ -450,7 +465,9 @@ class _MainDashboardState extends State<MainDashboard> {
       if (!mounted) return null;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تم حفظ التقرير بنجاح:\n$outputPath')),
+        SnackBar(
+          content: Text('تم حفظ التقرير بنجاح:\n$outputPath'),
+        ),
       );
 
       return outputPath;
@@ -458,7 +475,9 @@ class _MainDashboardState extends State<MainDashboard> {
       if (!mounted) return null;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('حدث خطأ أثناء إنشاء التقرير: $e')),
+        SnackBar(
+          content: Text('حدث خطأ أثناء إنشاء التقرير: $e'),
+        ),
       );
 
       return null;
@@ -472,118 +491,179 @@ class _MainDashboardState extends State<MainDashboard> {
         text,
         style: pw.TextStyle(
           fontSize: 10,
-          fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+          fontWeight: bold
+              ? pw.FontWeight.bold
+              : pw.FontWeight.normal,
         ),
       ),
     );
   }
 
-  ////////////////////////////////////////////////////////////
-  ////////////////$$$$$$$$$$$$$$$PDF$$$$$$$$$$$$$$$$//////////
-  ////////////////////////////////////////////////////////////
+  // ============================================================
+  // INITIALIZE AI SYSTEM
+  // ============================================================
+
   Future<void> _initializeSystem() async {
     try {
       print('[AI INIT] بدء تهيئة نموذج التوجيه...');
-      debugPrint('[AI INIT] بدء تهيئة نموذج التوجيه...');
-      developer.log('بدء تهيئة نموذج التوجيه', name: 'RadiologistAI.MainDashboard');
+
+      developer.log(
+        'بدء تهيئة نموذج التوجيه',
+        name: 'RadiologistAI.MainDashboard',
+      );
 
       await _aiService.initRouter();
 
       if (!mounted) return;
+
       setState(() {
         _currentStep = ProcessStep.idle;
         _statusMessage = "النظام جاهز (الموجه محمل)";
       });
 
       print('[AI INIT] تم تحميل نموذج التوجيه بنجاح.');
-      debugPrint('[AI INIT] تم تحميل نموذج التوجيه بنجاح.');
     } catch (e, stackTrace) {
       _logDiagnosticError('AI INIT ERROR', e, stackTrace);
 
       if (!mounted) return;
+
       setState(() {
         _currentStep = ProcessStep.error;
         _statusMessage =
-            'فشل تهيئة نظام الذكاء الاصطناعي.\nالخطأ: $e\n\nStackTrace:\n$stackTrace';
+            'فشل تهيئة نظام الذكاء الاصطناعي.\n'
+            'الخطأ: $e\n\nStackTrace:\n$stackTrace';
       });
     }
   }
 
-  Future<void> _pickAndProcessImage() async {
-    FilePickerResult? result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: [
-        'jpg',
-        'jpeg',
-        'png',
-        'dcm',
-      ], // إضافة dcm لو كنت تدعمه لاحقاً
-    );
+  // ============================================================
+  // PICK AND PROCESS IMAGE
+  // ============================================================
 
-    if (result != null && result.files.single.path != null) {
+  Future<void> _pickAndProcessImage() async {
+    // منع اختيار صورة أثناء المعالجة
+    if (_currentStep == ProcessStep.routing ||
+        _currentStep == ProcessStep.diagnosing ||
+        _currentStep == ProcessStep.loadingSpecialist) {
+      return;
+    }
+
+    try {
+      final FilePickerResult? result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png'],
+      );
+
+      if (result == null || result.files.single.path == null) {
+        return;
+      }
+
+      final selectedFile = File(result.files.single.path!);
+
+      if (!mounted) return;
+
       setState(() {
-        _selectedImage = File(result.files.single.path!);
+        _selectedImage = selectedFile;
         _currentStep = ProcessStep.routing;
         _routerResult = null;
         _finalResults = null;
         _statusMessage = "1. جاري معالجة الصورة والتوجيه...";
       });
 
-      try {
-        // 1. معالجة الصورة في Isolate
-        final inputTensor = await ImagePreProcessor.processImageAsTensor(
-          _selectedImage!.path,
-        );
+      // 1. معالجة الصورة
+      final inputTensor = await ImagePreProcessor.processImageAsTensor(
+        selectedFile.path,
+      );
 
-        // 2. تشغيل الموجه
-        _routerResult = _aiService.runRouter(inputTensor);
+      if (!mounted) return;
 
+      // 2. تشغيل نموذج التوجيه
+      final routerResult = _aiService.runRouter(inputTensor);
+
+      // 3. التحقق من نوع الصورة
+      if (routerResult.label.trim().toLowerCase() == 'other') {
         setState(() {
-          _currentStep = ProcessStep.loadingSpecialist;
-          _statusMessage =
-              "2. تم تحديد الأشعة: ${_routerResult!.label}. جاري تحميل المختص...";
-        });
+          _routerResult = routerResult;
 
-        // 3. تحميل النموذج المختص ديناميكياً
-        await Future.delayed(
-          const Duration(milliseconds: 500),
-        ); // محاكاة وقت التحميل للواجهة
-        await _aiService.loadSpecialist(_routerResult!.label);
+          _finalResults = null;
 
-        setState(() {
-          _currentStep = ProcessStep.diagnosing;
-          _statusMessage = "3. جاري فحص وتشخيص ${_routerResult!.label}...";
-        });
-
-        // 4. تشخيص النموذج المختص
-        await Future.delayed(
-          const Duration(milliseconds: 500),
-        ); // لضمان سلاسة الواجهة
-        _finalResults = _aiService.runSpecialist(inputTensor);
-
-        setState(() {
+          // ليست حالة خطأ برمجية
           _currentStep = ProcessStep.complete;
-          _statusMessage = "اكتمل التشخيص.";
-        });
-      } catch (e, stackTrace) {
-        // هذا السجل يحدد الخطأ إن حدث أثناء المعالجة أو تشغيل أحد النماذج.
-        _logDiagnosticError('AI ANALYSIS ERROR', e, stackTrace);
 
-        if (!mounted) return;
-        setState(() {
-          _currentStep = ProcessStep.error;
           _statusMessage =
-              'حدث خطأ أثناء تحليل الصورة.\nالخطأ: $e\n\nStackTrace:\n$stackTrace';
+              "الصورة غير مدعومة.\n"
+              "يرجى اختيار صورة أشعة طبية من الأنواع المدعومة.";
         });
+
+        // إيقاف المعالجة وعدم تحميل أي نموذج مختص
+        return;
       }
+
+      // 4. تحديث حالة التوجيه
+      setState(() {
+        _routerResult = routerResult;
+
+        _currentStep = ProcessStep.loadingSpecialist;
+
+        _statusMessage =
+            "2. تم تحديد الأشعة: ${routerResult.label}. "
+            "جاري تحميل النموذج المختص...";
+      });
+
+      // 5. تحميل النموذج المختص
+      await _aiService.loadSpecialist(routerResult.label);
+
+      if (!mounted) return;
+
+      setState(() {
+        _currentStep = ProcessStep.diagnosing;
+
+        _statusMessage =
+            "3. جاري فحص وتشخيص ${routerResult.label}...";
+      });
+
+      // 6. تشغيل نموذج التشخيص
+      final finalResults = _aiService.runSpecialist(inputTensor);
+
+      if (!mounted) return;
+
+      // 7. عرض النتائج
+      setState(() {
+        _finalResults = finalResults;
+
+        _currentStep = ProcessStep.complete;
+
+        _statusMessage = "اكتمل التشخيص بنجاح.";
+      });
+    } catch (e, stackTrace) {
+      _logDiagnosticError('AI ANALYSIS ERROR', e, stackTrace);
+
+      if (!mounted) return;
+
+      setState(() {
+        _currentStep = ProcessStep.error;
+
+        _statusMessage =
+            'حدث خطأ أثناء تحليل الصورة.\n'
+            'الخطأ: $e\n\nStackTrace:\n$stackTrace';
+      });
     }
   }
 
+  // ============================================================
+  // DISPOSE
+  // ============================================================
+
   @override
   void dispose() {
+    numController.dispose();
     _aiService.dispose();
     super.dispose();
   }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -592,11 +672,8 @@ class _MainDashboardState extends State<MainDashboard> {
         children: [
           Row(
             children: [
-              // القائمة الجانبية (Sidebar)
               Sidebar(),
-              /////////////////////
 
-              // المنطقة المركزية (Central Panel)
               Expanded(
                 flex: 7,
                 child: Container(
@@ -605,9 +682,8 @@ class _MainDashboardState extends State<MainDashboard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      /////////////////////
                       Header(),
-                      /////////////////////
+
                       const SizedBox(height: 32),
 
                       Expanded(
@@ -620,16 +696,25 @@ class _MainDashboardState extends State<MainDashboard> {
                               child: Column(
                                 children: [
                                   _buildDragDropZone(),
+
                                   const SizedBox(height: 24),
+
                                   _buildProgressTracker(),
+
                                   const SizedBox(height: 24),
+
                                   _buildFeet(),
                                 ],
                               ),
                             ),
+
                             const SizedBox(width: 32),
+
                             // منطقة النتائج
-                            Expanded(flex: 1, child: _buildResultsPanel()),
+                            Expanded(
+                              flex: 1,
+                              child: _buildResultsPanel(),
+                            ),
                           ],
                         ),
                       ),
@@ -639,90 +724,125 @@ class _MainDashboardState extends State<MainDashboard> {
               ),
             ],
           ),
-          showCustomDialogue == true
-              ? CustomDialogue(
-                  numController: numController,
-                  iconOk: Icons.check_circle,
-                  onPressediconOk: () async {
-                    // التأكد من وجود صورة
-                    if (_selectedImage == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please select an X-ray image first'),
-                        ),
-                      );
 
-                      return;
-                    }
+          // نافذة إدخال الرقم الوطني
+          if (showCustomDialogue)
+            CustomDialogue(
+              numController: numController,
+              iconOk: Icons.check_circle,
 
-                    // التأكد من وجود رقم المريض
-                    if (numController.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please enter patient ID'),
-                        ),
-                      );
+              onPressediconOk: () async {
+                // التأكد من وجود صورة
+                if (_selectedImage == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Please select an X-ray image first',
+                      ),
+                    ),
+                  );
 
-                      return;
-                    }
+                  return;
+                }
 
-                    try {
-                      showCustomDialogue = false;
-                      // 1. إنشاء وحفظ PDF
-                      final String? pdfPath = await _saveDiagnosticAsPdf();
+                // التأكد من وجود نتائج تشخيص
+                if (_finalResults == null ||
+                    _finalResults!.isEmpty ||
+                    _isUnsupportedImage) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'لا توجد نتائج تشخيص صالحة لحفظها.',
+                      ),
+                    ),
+                  );
 
-                      if (pdfPath == null) {
-                        return;
-                      }
+                  return;
+                }
 
-                      // 2. إرسال PDF + صورة الأشعة إلى السيرفر
-                      final success = await SendDiagnosis().addDiagnosi(
-                        context,
-                        numController.text.trim(),
-                        DateTime.now().toString(),
-                        pdfPath,
-                        _selectedImage!.path,
-                      );
+                // التأكد من وجود رقم المريض
+                if (numController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter patient ID'),
+                    ),
+                  );
 
-                      // 3. إذا نجح الحفظ في قاعدة البيانات
-                      if (success) {
-                        setState(() {
-                          showCustomDialogue = false;
-                          numController.text = "";
-                        });
+                  return;
+                }
 
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('تم حفظ التقرير والبيانات بنجاح'),
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      print("Save diagnosis error: $e");
+                try {
+                  setState(() {
+                    showCustomDialogue = false;
+                  });
 
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('حدث خطأ أثناء حفظ التشخيص: $e'),
-                        ),
-                      );
-                    }
-                  },
+                  // 1. إنشاء وحفظ PDF
+                  final String? pdfPath =
+                      await _saveDiagnosticAsPdf();
 
-                  iconNo: Icons.cancel_sharp,
-                  onPressediconNo: () {
+                  if (pdfPath == null) {
+                    return;
+                  }
+
+                  if (!mounted) return;
+
+                  // 2. إرسال PDF وصورة الأشعة إلى السيرفر
+                  final success = await SendDiagnosis().addDiagnosi(
+                    context,
+                    numController.text.trim(),
+                    DateTime.now().toString(),
+                    pdfPath,
+                    _selectedImage!.path,
+                  );
+
+                  // 3. عند نجاح الحفظ
+                  if (success && mounted) {
                     setState(() {
                       showCustomDialogue = false;
+                      numController.clear();
                     });
-                  },
-                  text: "ادخل الرقم الوطني",
-                )
-              : const SizedBox(),
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'تم حفظ التقرير والبيانات بنجاح',
+                        ),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  print("Save diagnosis error: $e");
+
+                  if (!mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'حدث خطأ أثناء حفظ التشخيص: $e',
+                      ),
+                    ),
+                  );
+                }
+              },
+
+              iconNo: Icons.cancel_sharp,
+
+              onPressediconNo: () {
+                setState(() {
+                  showCustomDialogue = false;
+                });
+              },
+
+              text: "ادخل الرقم الوطني",
+            ),
         ],
       ),
     );
   }
 
-  // --- مكونات واجهة المستخدم (Widgets) ---
+  // ============================================================
+  // SUPPORTED BODY SECTIONS
+  // ============================================================
 
   Widget _buildFeet() {
     final List<String> sectionstext = [
@@ -731,6 +851,7 @@ class _MainDashboardState extends State<MainDashboard> {
       'teeth',
       'knee',
       'liver',
+      'other',
       'hand',
       'elbow',
       'finger',
@@ -746,6 +867,7 @@ class _MainDashboardState extends State<MainDashboard> {
       'assets/imgs/tooth.png',
       'assets/imgs/knee.png',
       'assets/imgs/liver.png',
+      'assets/imgs/other.png',
       'assets/imgs/hand.png',
       'assets/imgs/elbow.png',
       'assets/imgs/finger.png',
@@ -765,25 +887,27 @@ class _MainDashboardState extends State<MainDashboard> {
         ),
         child: SingleChildScrollView(
           child: Wrap(
-            spacing: 12.0, // المسافة الأفقيّة بين العناصر
-            runSpacing: 12.0, // المسافة الرأسية بين السطور
+            spacing: 12,
+            runSpacing: 12,
             children: List.generate(sectionstext.length, (index) {
+              final bool isSelected =
+                  _routerResult != null &&
+                  _routerResult!.label.toLowerCase() ==
+                      sectionstext[index].toLowerCase();
+
               return Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: _routerResult != null
-                      ? _routerResult!.label == sectionstext[index]
-                            ? AppColors.cyanAccent
-                            : Colors.white
-                      : Colors.white, // خلفية خفيفة لكل عنصر (اختياري)
+                  color: isSelected
+                      ? AppColors.cyanAccent
+                      : Colors.white,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
-                  mainAxisSize:
-                      MainAxisSize.min, // لجعل العنصر يأخذ مساحة محتواه فقط
+                  mainAxisSize: MainAxisSize.min,
                   spacing: 8,
                   children: [
                     Text(
@@ -793,6 +917,7 @@ class _MainDashboardState extends State<MainDashboard> {
                         color: Colors.black,
                       ),
                     ),
+
                     SizedBox(
                       width: 30,
                       height: 30,
@@ -801,9 +926,12 @@ class _MainDashboardState extends State<MainDashboard> {
                         fit: BoxFit.contain,
                       ),
                     ),
+
                     Text(
                       sectionstext[index],
-                      style: const TextStyle(color: Colors.black),
+                      style: const TextStyle(
+                        color: Colors.black,
+                      ),
                     ),
                   ],
                 ),
@@ -815,14 +943,19 @@ class _MainDashboardState extends State<MainDashboard> {
     );
   }
 
+  // ============================================================
+  // IMAGE PICKER
+  // ============================================================
+
   Widget _buildDragDropZone() {
+    final bool isProcessing =
+        _currentStep == ProcessStep.routing ||
+        _currentStep == ProcessStep.diagnosing ||
+        _currentStep == ProcessStep.loadingSpecialist;
+
     return GestureDetector(
-      onTap:
-          _currentStep == ProcessStep.routing ||
-              _currentStep == ProcessStep.diagnosing ||
-              _currentStep == ProcessStep.loadingSpecialist
-          ? null
-          : _pickAndProcessImage,
+      onTap: isProcessing ? null : _pickAndProcessImage,
+
       child: Container(
         height: 350,
         width: double.infinity,
@@ -834,6 +967,7 @@ class _MainDashboardState extends State<MainDashboard> {
           ),
           borderRadius: BorderRadius.circular(16),
         ),
+
         child: _selectedImage == null
             ? const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -843,7 +977,9 @@ class _MainDashboardState extends State<MainDashboard> {
                     size: 80,
                     color: AppColors.textSecondary,
                   ),
+
                   SizedBox(height: 16),
+
                   Text(
                     "انقر لاختيار صورة الأشعة",
                     style: TextStyle(
@@ -851,20 +987,31 @@ class _MainDashboardState extends State<MainDashboard> {
                       fontSize: 18,
                     ),
                   ),
+
                   SizedBox(height: 8),
+
                   Text(
                     "يدعم صيغ JPG, PNG",
-                    style: TextStyle(color: AppColors.textSecondary),
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               )
             : ClipRRect(
                 borderRadius: BorderRadius.circular(14),
-                child: Image.file(_selectedImage!, fit: BoxFit.cover),
+                child: Image.file(
+                  _selectedImage!,
+                  fit: BoxFit.cover,
+                ),
               ),
       ),
     );
   }
+
+  // ============================================================
+  // PROGRESS TRACKER
+  // ============================================================
 
   Widget _buildProgressTracker() {
     return Container(
@@ -873,6 +1020,7 @@ class _MainDashboardState extends State<MainDashboard> {
         color: AppColors.slateGrey,
         borderRadius: BorderRadius.circular(12),
       ),
+
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -883,16 +1031,26 @@ class _MainDashboardState extends State<MainDashboard> {
               color: AppColors.textPrimary,
             ),
           ),
+
           const SizedBox(height: 12),
+
           Text(
             _statusMessage,
-            style: const TextStyle(color: AppColors.cyanAccent),
+            style: TextStyle(
+              color: _isUnsupportedImage
+                  ? Colors.orangeAccent
+                  : AppColors.cyanAccent,
+            ),
           ),
+
           const SizedBox(height: 16),
+
           LinearProgressIndicator(
             value: _getProgressBarValue(),
             backgroundColor: AppColors.navyDark,
-            color: AppColors.cyanAccent,
+            color: _isUnsupportedImage
+                ? Colors.orangeAccent
+                : AppColors.cyanAccent,
             minHeight: 8,
             borderRadius: BorderRadius.circular(4),
           ),
@@ -905,18 +1063,27 @@ class _MainDashboardState extends State<MainDashboard> {
     switch (_currentStep) {
       case ProcessStep.idle:
         return 0.0;
+
       case ProcessStep.routing:
         return 0.33;
+
       case ProcessStep.loadingSpecialist:
         return 0.66;
+
       case ProcessStep.diagnosing:
         return 0.85;
+
       case ProcessStep.complete:
         return 1.0;
+
       case ProcessStep.error:
         return 0.0;
     }
   }
+
+  // ============================================================
+  // RESULTS PANEL
+  // ============================================================
 
   Widget _buildResultsPanel() {
     return Container(
@@ -926,13 +1093,19 @@ class _MainDashboardState extends State<MainDashboard> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white10),
       ),
+
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.analytics_outlined, color: AppColors.cyanAccent),
+              Icon(
+                Icons.analytics_outlined,
+                color: AppColors.cyanAccent,
+              ),
+
               SizedBox(width: 8),
+
               Text(
                 "التقرير التشخيصي (AI)",
                 style: TextStyle(
@@ -943,18 +1116,26 @@ class _MainDashboardState extends State<MainDashboard> {
               ),
             ],
           ),
-          const Divider(color: Colors.white24, height: 32),
 
+          const Divider(
+            color: Colors.white24,
+            height: 32,
+          ),
+
+          // الحالة الابتدائية
           if (_currentStep == ProcessStep.idle)
             const Expanded(
               child: Center(
                 child: Text(
                   "لا توجد نتائج حالياً.",
-                  style: TextStyle(color: AppColors.textSecondary),
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
             ),
 
+          // حالة الخطأ الحقيقي فقط
           if (_currentStep == ProcessStep.error)
             Expanded(
               child: Center(
@@ -971,99 +1152,195 @@ class _MainDashboardState extends State<MainDashboard> {
               ),
             ),
 
-          if (_routerResult != null) ...[
-            Text(
-              "نوع الأشعة المكتشف:",
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-            ),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.cyanAccent.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.cyanAccent),
-              ),
-              child: Text(
-                "${_routerResult!.label} (ثقة: ${(_routerResult!.confidence * 100).toStringAsFixed(1)}%)",
-                style: const TextStyle(
-                  color: AppColors.cyanAccent,
-                  fontWeight: FontWeight.bold,
+          // حالة الصورة غير المدعومة
+          if (_currentStep == ProcessStep.complete &&
+              _isUnsupportedImage)
+            const Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.image_not_supported_outlined,
+                      color: Colors.orangeAccent,
+                      size: 75,
+                    ),
+
+                    SizedBox(height: 20),
+
+                    Text(
+                      "صورة غير مدعومة",
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+
+                    SizedBox(height: 12),
+
+                    Text(
+                      "يرجى اختيار صورة أشعة من الأنواع "
+                      "الطبية المدعومة.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-          ],
 
-          if (_finalResults != null) ...[
-            const Text(
-              "أفضل 3 احتمالات تشخيصية:",
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: ListView.builder(
-                itemCount: _finalResults!.length,
-                itemBuilder: (context, index) {
-                  final result = _finalResults![index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              result.label,
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              "${(result.confidence * 100).toStringAsFixed(1)}%",
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        LinearProgressIndicator(
-                          value: result.confidence,
-                          backgroundColor: AppColors.navyDark,
-                          color: index == 0
-                              ? AppColors.cyanAccent
-                              : Colors.white38,
-                          minHeight: 12,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                      ],
+          // نوع الأشعة المكتشف
+          if (_routerResult != null &&
+              !_isUnsupportedImage)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "نوع الأشعة المكتشف:",
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.cyanAccent.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.cyanAccent,
                     ),
-                  );
-                },
-              ),
+                  ),
+
+                  child: Text(
+                    "${_routerResult!.label} "
+                    "(ثقة: ${(_routerResult!.confidence * 100).toStringAsFixed(1)}%)",
+                    style: const TextStyle(
+                      color: AppColors.cyanAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+              ],
             ),
-          ] else if (_currentStep != ProcessStep.idle &&
-              _currentStep != ProcessStep.error) ...[
+
+          // النتائج التشخيصية
+          if (_finalResults != null)
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "أفضل 3 احتمالات تشخيصية:",
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 14,
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: _finalResults!.length,
+                      itemBuilder: (context, index) {
+                        final result = _finalResults![index];
+
+                        return Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: 16,
+                          ),
+
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    result.label,
+                                    style: const TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+
+                                  Text(
+                                    "${(result.confidence * 100).toStringAsFixed(1)}%",
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 8),
+
+                              LinearProgressIndicator(
+                                value: result.confidence,
+                                backgroundColor: AppColors.navyDark,
+                                color: index == 0
+                                    ? AppColors.cyanAccent
+                                    : Colors.white38,
+                                minHeight: 12,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            )
+
+          // مؤشر التحميل
+          else if (_currentStep != ProcessStep.idle &&
+              _currentStep != ProcessStep.error &&
+              !_isUnsupportedImage &&
+              _currentStep != ProcessStep.complete)
             const Expanded(
               child: Center(
-                child: CircularProgressIndicator(color: AppColors.cyanAccent),
+                child: CircularProgressIndicator(
+                  color: AppColors.cyanAccent,
+                ),
               ),
             ),
-          ],
-          if (_finalResults != null) ...[
-            const Divider(color: Colors.white24, height: 32),
+
+          // زر الطباعة: يظهر فقط عند وجود نتائج فعلية
+          if (_finalResults != null &&
+              _finalResults!.isNotEmpty &&
+              _currentStep == ProcessStep.complete &&
+              !_isUnsupportedImage) ...[
+            const Divider(
+              color: Colors.white24,
+              height: 32,
+            ),
+
             Center(
               child: TextButton(
                 onPressed: () {
                   setState(() {
                     showCustomDialogue = true;
-                    print("showCustomDialogue => true ");
                   });
                 },
-                child: Text(
+
+                child: const Text(
                   "Print",
                   style: TextStyle(
                     color: Colors.white,
