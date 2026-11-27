@@ -4,6 +4,8 @@ import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 import 'package:radiologist_ai/ai_processing/diagnostic_result.dart';
+import 'package:radiologist_ai/ai_processing/explainability_service.dart';
+import 'package:radiologist_ai/widgets/medical_heatmap_view.dart';
 import 'package:radiologist_ai/ai_processing/image_pre_processor.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:radiologist_ai/api/send_diagnosis.dart';
@@ -24,6 +26,7 @@ class MainDashboard extends StatefulWidget {
 
 class _MainDashboardState extends State<MainDashboard> {
   final AIPipelineService _aiService = AIPipelineService();
+  final ExplainabilityService _explainabilityService = ExplainabilityService();
 
   final TextEditingController numController = TextEditingController();
 
@@ -36,6 +39,10 @@ class _MainDashboardState extends State<MainDashboard> {
   DiagnosticResult? _routerResult;
 
   List<DiagnosticResult>? _finalResults;
+
+  List<List<List<List<double>>>>? _lastInputTensor;
+  bool _isGeneratingChestGradCam = false;
+  String? _chestGradCamError;
 
   bool showCustomDialogue = false;
 
@@ -567,6 +574,9 @@ class _MainDashboardState extends State<MainDashboard> {
         _currentStep = ProcessStep.routing;
         _routerResult = null;
         _finalResults = null;
+        _lastInputTensor = null;
+        _chestGradCamError = null;
+        _isGeneratingChestGradCam = false;
         _statusMessage = "1. جاري معالجة الصورة والتوجيه...";
       });
 
@@ -574,6 +584,7 @@ class _MainDashboardState extends State<MainDashboard> {
       final inputTensor = await ImagePreProcessor.processImageAsTensor(
         selectedFile.path,
       );
+      _lastInputTensor = inputTensor;
 
       if (!mounted) return;
 
@@ -647,6 +658,70 @@ class _MainDashboardState extends State<MainDashboard> {
             'حدث خطأ أثناء تحليل الصورة.\n'
             'الخطأ: $e\n\nStackTrace:\n$stackTrace';
       });
+    }
+  }
+
+
+  // ============================================================
+  // CHEST GRAD-CAM (OPTIONAL EXPLANATION)
+  // ============================================================
+
+  Future<void> _generateChestGradCam() async {
+    if (_isGeneratingChestGradCam ||
+        _lastInputTensor == null ||
+        _finalResults == null ||
+        _finalResults!.isEmpty ||
+        _routerResult?.label.trim().toLowerCase() != 'chest') {
+      return;
+    }
+
+    final classIndex = _finalResults!.first.classIndex;
+    if (classIndex < 0) {
+      setState(() {
+        _chestGradCamError =
+            'تعذر معرفة رقم الفئة الأصلي. أعد تشغيل التطبيق بعد تحديث ملفات Grad-CAM.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isGeneratingChestGradCam = true;
+      _chestGradCamError = null;
+    });
+
+    try {
+      final result = await _explainabilityService.generateChestGradCam(
+        inputTensor: _lastInputTensor!,
+        classIndex: classIndex,
+      );
+
+      if (!mounted) return;
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => MedicalHeatmapView(result: result),
+        ),
+      );
+    } catch (error, stackTrace) {
+      _logDiagnosticError('CHEST GRAD-CAM ERROR', error, stackTrace);
+
+      if (!mounted) return;
+      setState(() {
+        _chestGradCamError = error.toString();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تعذر إنشاء خريطة Grad-CAM: $error'),
+          duration: const Duration(seconds: 8),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGeneratingChestGradCam = false;
+        });
+      }
     }
   }
 
@@ -1321,6 +1396,49 @@ class _MainDashboardState extends State<MainDashboard> {
                 ),
               ),
             ),
+
+
+          // Grad-CAM button is displayed only for completed Chest diagnostics.
+          if (_routerResult?.label.trim().toLowerCase() == 'chest' &&
+              _finalResults != null &&
+              _finalResults!.isNotEmpty &&
+              _currentStep == ProcessStep.complete) ...[
+            const Divider(color: Colors.white24, height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isGeneratingChestGradCam ||
+                        _lastInputTensor == null
+                    ? null
+                    : _generateChestGradCam,
+                icon: _isGeneratingChestGradCam
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.local_fire_department_outlined),
+                label: Text(
+                  _isGeneratingChestGradCam
+                      ? 'جاري إنشاء الخريطة الحرارية...'
+                      : 'عرض خريطة Grad-CAM',
+                ),
+              ),
+            ),
+            if (_chestGradCamError != null) ...[
+              const SizedBox(height: 8),
+              SelectableText(
+                _chestGradCamError!,
+                style: const TextStyle(
+                  color: Colors.orangeAccent,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ],
 
           // زر الطباعة: يظهر فقط عند وجود نتائج فعلية
           if (_finalResults != null &&
