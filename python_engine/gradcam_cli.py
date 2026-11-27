@@ -116,9 +116,10 @@ def main() -> int:
     print(f"Loading Keras model: {args.model}", flush=True)
     model = tf.keras.models.load_model(args.model, compile=False)
 
-    if tuple(model.input_shape) != INPUT_SHAPE:
+    model_image_shape = tuple(model.input_shape[1:])
+    if model_image_shape != INPUT_SHAPE[1:]:
         raise ValueError(
-            f"Model input shape {model.input_shape} does not match {INPUT_SHAPE}."
+            f"Model image shape {model_image_shape} does not match {INPUT_SHAPE[1:]}."
         )
     if int(model.output_shape[-1]) != len(labels):
         raise ValueError(
