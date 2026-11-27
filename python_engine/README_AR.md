@@ -1,15 +1,16 @@
 # دمج Grad-CAM لنموذج Chest في Radiologist AI
 
 ## ما الذي يفعله هذا المكوّن؟
-يضيف زرًا اختيارياً بعد اكتمال تشخيص Chest في Flutter. عند الضغط عليه يأخذ نفس Tensor الذي أرسله Flutter إلى TFLite (RGB، أبعاد 224×224، قيم 0..255)، ويكتبه مؤقتاً كقيم float32 little-endian، ثم يشغّل محرك Python محلياً على Windows. يحسب المحرك Grad-CAM باستخدام ملف Keras الأصلي، ويتحقق أن أعلى فئة في Keras تطابق الفئة التي اختارها TFLite، ثم يعيد خريطة حرارية شفافة وصورة الإدخال المطابقة لما شاهده النموذج.
+يضيف زرًا اختيارياً بعد اكتمال تشخيص Chest في Flutter. عند الضغط عليه يأخذ نفس Tensor الذي أرسله Flutter إلى TFLite (RGB، أبعاد 224×224، قيم 0..255)، ويكتبه مؤقتاً كقيم float32 little-endian، ثم يشغّل محرك Python محلياً على Windows. يحسب المحرك Grad-CAM باستخدام ملف Keras الأصلي، ويعيد تشغيل نموذج TFLite نفسه على المدخل ذاته، ويقارن احتمالاته مع Keras. إذا اختلفت الفئة الأعلى يتوقف بدلاً من عرض خريطة لتصنيف مختلف، ثم يعيد خريطة حرارية شفافة وصورة الإدخال المطابقة لما شاهده النموذج.
 
 لا يُستبدل نموذج TFLite ولا تتغير عملية التشخيص الحالية.
 
 ## الإعداد للمطور على Windows
 1. ثبّت Python 3.12 (64-bit) كخيار مفضل، أو Python 3.10 أو 3.11 أو 3.13.
-2. افتح مجلد المشروع python_engine.
-3. شغّل setup_windows.bat. التثبيت الأول لمكتبات TensorFlow وPillow يحتاج إنترنت.
-4. تأكد من وجود Microsoft Visual C++ Redistributable إذا ظهرت أخطاء DLL عند استيراد TensorFlow.\n5. انسخ chest_model.keras إلى python_engine/models/chest_model.keras.
+2. تأكد من تثبيت Microsoft Visual C++ Redistributable.
+3. افتح مجلد المشروع python_engine.
+4. انسخ chest_model.keras إلى python_engine/models/chest_model.keras.
+5. شغّل setup_windows.bat. التثبيت الأول لمكتبات TensorFlow وPillow يحتاج إنترنت.
 6. شغّل تطبيق Flutter على Windows.
 
 في وضع التطوير يستخدم Flutter تلقائياً:
@@ -32,7 +33,8 @@ python_engine/.venv/Scripts/python.exe
 من نافذة PowerShell، افتح مجلد المشروع الذي يحتوي على pubspec.yaml ثم نفّذ:
 
 ```powershell
-git switch feature/chest-gradcam-windows
+git fetch origin
+git switch --track origin/feature/chest-gradcam-windows
 flutter pub get
 ```
 
