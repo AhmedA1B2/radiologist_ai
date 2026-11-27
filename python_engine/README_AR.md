@@ -26,3 +26,45 @@ python_engine/.venv/Scripts/python.exe
 - ملف Keras الكبير لا يُضاف إلى Git. يجب وضعه يدوياً في المسار المذكور.
 - إذا اختلف أعلى تصنيف Keras عن التصنيف الذي أعاده TFLite، يوقف المحرك عرض الخريطة لتجنب تفسير قرار مختلف.
 - Grad-CAM تفسير بصري تقريبي، وليس تحديداً دقيقاً لحدود المرض أو تشخيصاً طبياً مستقلاً.
+
+## خطوات تشغيل الاختبار داخل المشروع الفعلي
+
+من نافذة PowerShell، افتح مجلد المشروع الذي يحتوي على pubspec.yaml ثم نفّذ:
+
+```powershell
+git switch feature/chest-gradcam-windows
+flutter pub get
+```
+
+ضع نموذج Keras في المسار التالي بالضبط:
+
+```
+python_engine/models/chest_model.keras
+```
+
+ثم شغّل:
+
+```powershell
+cd python_engine
+.\setup_windows.bat
+cd ..
+flutter run -d windows
+```
+
+بعد فتح البرنامج:
+1. اختر صورة أشعة صدر مدعومة.
+2. انتظر انتهاء التشخيص وظهور نتائج Chest.
+3. اضغط زر "عرض خريطة Grad-CAM".
+4. انتظر تحميل نموذج Keras وحساب الخريطة لأول مرة. قد يستغرق ذلك وقتاً أطول من التصنيف العادي.
+5. استخدم شريط الشفافية وقارن الخريطة مع صورة الإدخال.
+
+إذا لم يتعرف التطبيق على Python، افتح PowerShell من مجلد المشروع واضبط المتغير قبل التشغيل:
+
+```powershell
+$env:RADIOLOGIST_AI_PYTHON = "C:\Users\YOUR_USER\AppData\Local\Programs\Python\Python312\python.exe"
+flutter run -d windows
+```
+
+استبدل المسار بمسار Python الفعلي على جهازك.
+
+**تنبيه توافق:** هذه الإضافة تستخدم Python/TensorFlow محلياً أثناء التطوير. ليست بعد حزمة مستقلة للمستخدم النهائي؛ عند تجهيز نسخة Release يجب تضمين Python والاعتماديات وملف Keras ضمن حزمة Windows. تثبيت TensorFlow على Windows يستخدم المعالجة المركزية CPU، ولا تعتمد هذه النسخة على CUDA.
