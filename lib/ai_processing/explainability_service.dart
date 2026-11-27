@@ -215,7 +215,7 @@ class ExplainabilityService {
   }
 
   String _absolute(String path) {
-    if (File(path).isAbsolute) return path;
+    if (FileSystemEntity.isAbsolute(path)) return path;
     return Directory.current.path + Platform.pathSeparator + path;
   }
 }
