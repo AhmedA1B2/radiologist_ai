@@ -53,13 +53,34 @@ def build_gradcam_graph(model: tf.keras.Model):
     backbone_index, backbone = find_backbone(model)
     target_layer = find_target_layer(backbone)
 
+    # A nested Functional model's own .input points at its internal Keras
+    # InputLayer. For the parent graph, use the tensor that was actually fed
+    # into the nested backbone call (after the model's preprocessing layers).
+    inbound_nodes = getattr(backbone, "_inbound_nodes", [])
+    backbone_call_input = None
+    for node in reversed(inbound_nodes):
+        node_inputs = getattr(node, "input_tensors", None)
+        if node_inputs is not None:
+            if isinstance(node_inputs, (list, tuple)):
+                if len(node_inputs) != 1:
+                    raise RuntimeError("Expected a single input to the DenseNet backbone.")
+                backbone_call_input = node_inputs[0]
+            else:
+                backbone_call_input = node_inputs
+            break
+
+    if backbone_call_input is None:
+        raise RuntimeError(
+            "Could not locate the input tensor connected to the nested DenseNet call."
+        )
+
     preprocessing_model = tf.keras.Model(
         inputs=model.inputs,
-        outputs=backbone.input,
+        outputs=backbone_call_input,
         name="chest_preprocessing_to_densenet",
     )
     feature_model = tf.keras.Model(
-        inputs=backbone.input,
+        inputs=backbone.inputs,
         outputs=[target_layer.output, backbone.output],
         name="chest_densenet_gradcam_features",
     )
