@@ -23,12 +23,16 @@ class ChestGradCamResult {
     required this.layerName,
     required this.featureMapShape,
     required this.warning,
+    required this.maxAbsProbabilityDifference,
+    required this.meanAbsProbabilityDifference,
   });
 
   factory ChestGradCamResult.fromJson(Map<String, dynamic> json) {
     final index = (json['class_index'] as num?)?.toInt();
     if (json['status'] != 'ok' || index == null) {
-      throw const FormatException('The Grad-CAM engine returned an invalid result.');
+      throw const FormatException(
+        'The Grad-CAM engine returned an invalid result.',
+      );
     }
     return ChestGradCamResult(
       heatmapPath: json['heatmap_image'] as String,
@@ -44,7 +48,8 @@ class ChestGradCamResult {
       featureMapShape: (json['feature_map_shape'] as List<dynamic>? ?? const [])
           .map((value) => (value as num).toInt())
           .toList(),
-      warning: json['warning'] as String? ??
+      warning:
+          json['warning'] as String? ??
           'Grad-CAM is a visual explanation, not a medical diagnosis.',
     );
   }
@@ -53,7 +58,8 @@ class ChestGradCamResult {
 /// Calls the Grad-CAM Python engine locally. No network/API is used at runtime.
 class ExplainabilityService {
   static const String _engineRelativePath = 'python_engine';
-  static const String _modelRelativePath = 'python_engine/models/chest_model.keras';
+  static const String _modelRelativePath =
+      'python_engine/models/chest_model.keras';
   static const String _tfliteRelativePath =
       'assets/ai_model/chest_model/chest_model.tflite';
   static const String _labelsRelativePath =
@@ -77,7 +83,9 @@ class ExplainabilityService {
         inputTensor.first.length != 224 ||
         inputTensor.first.any((row) => row.length != 224) ||
         inputTensor.first.any((row) => row.any((pixel) => pixel.length != 3))) {
-      throw ArgumentError('Grad-CAM requires an input tensor with shape [1,224,224,3].');
+      throw ArgumentError(
+        'Grad-CAM requires an input tensor with shape [1,224,224,3].',
+      );
     }
 
     final root = await _findProjectRoot();
@@ -103,7 +111,10 @@ class ExplainabilityService {
       );
     }
     if (!await File(tflitePath).exists()) {
-      throw FileSystemException('Chest TFLite model was not found.', tflitePath);
+      throw FileSystemException(
+        'Chest TFLite model was not found.',
+        tflitePath,
+      );
     }
     if (!await File(labelsPath).exists()) {
       throw FileSystemException('Chest labels file was not found.', labelsPath);
@@ -114,10 +125,9 @@ class ExplainabilityService {
       join(engineDirectory, '.venv'),
       'Scripts/python.exe',
     );
-    final pythonExecutable = pythonOverride ??
-        (await File(bundledVenvPython).exists()
-            ? bundledVenvPython
-            : 'python');
+    final pythonExecutable =
+        pythonOverride ??
+        (await File(bundledVenvPython).exists() ? bundledVenvPython : 'python');
 
     final workDirectory = await Directory.systemTemp.createTemp(
       'radiologist_ai_chest_gradcam_',
@@ -159,7 +169,9 @@ class ExplainabilityService {
       final stderr = await stderrFuture;
 
       if (exitCode != 0) {
-        final details = stderr.trim().isNotEmpty ? stderr.trim() : stdout.trim();
+        final details = stderr.trim().isNotEmpty
+            ? stderr.trim()
+            : stdout.trim();
         throw ProcessException(
           pythonExecutable,
           arguments,
@@ -179,17 +191,15 @@ class ExplainabilityService {
 
       final decoded = jsonDecode(await resultFile.readAsString());
       if (decoded is! Map<String, dynamic>) {
-        throw const FormatException('Grad-CAM result JSON has an unexpected format.');
+        throw const FormatException(
+          'Grad-CAM result JSON has an unexpected format.',
+        );
       }
       final result = ChestGradCamResult.fromJson(decoded);
 
       if (result.classIndex != classIndex) {
         throw StateError(
-          'Grad-CAM returned class ' +
-              result.classIndex.toString() +
-              ', but Flutter requested ' +
-              classIndex.toString() +
-              '.',
+          'Grad-CAM returned class ${result.classIndex}, but Flutter requested $classIndex.',
         );
       }
       if (!await File(result.heatmapPath).exists() ||
@@ -232,20 +242,10 @@ class ExplainabilityService {
     var candidate = Directory.current.absolute;
     while (true) {
       final separator = Platform.pathSeparator;
-      final candidateScript = candidate.path +
-          separator +
-          'python_engine' +
-          separator +
-          'gradcam_cli.py';
-      final candidateLabels = candidate.path +
-          separator +
-          'assets' +
-          separator +
-          'ai_model' +
-          separator +
-          'chest_model' +
-          separator +
-          'chest_labels.json';
+      final candidateScript =
+          '${candidate.path}${separator}python_engine${separator}gradcam_cli.py';
+      final candidateLabels =
+          '${candidate.path}${separator}assets${separator}ai_model${separator}chest_model${separator}chest_labels.json';
 
       if (await File(candidateScript).exists() &&
           await File(candidateLabels).exists()) {
@@ -265,7 +265,6 @@ class ExplainabilityService {
   }
 
   String _absolute(String path) {
-    if (FileSystemEntity.isAbsolute(path)) return path;
-    return Directory.current.path + Platform.pathSeparator + path;
+    return File(path).absolute.path;
   }
 }
