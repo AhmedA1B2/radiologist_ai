@@ -80,7 +80,7 @@ class ExplainabilityService {
       throw ArgumentError('Grad-CAM requires an input tensor with shape [1,224,224,3].');
     }
 
-    final root = Directory.current.path;
+    final root = await _findProjectRoot();
     String join(String first, String second) =>
         first + Platform.pathSeparator + second;
 
@@ -226,6 +226,42 @@ class ExplainabilityService {
       throw StateError('Unexpected tensor value count: $index.');
     }
     return bytes.buffer.asUint8List();
+  }
+
+  Future<String> _findProjectRoot() async {
+    var candidate = Directory.current.absolute;
+    while (true) {
+      final separator = Platform.pathSeparator;
+      final candidateScript = candidate.path +
+          separator +
+          'python_engine' +
+          separator +
+          'gradcam_cli.py';
+      final candidateLabels = candidate.path +
+          separator +
+          'assets' +
+          separator +
+          'ai_model' +
+          separator +
+          'chest_model' +
+          separator +
+          'chest_labels.json';
+
+      if (await File(candidateScript).exists() &&
+          await File(candidateLabels).exists()) {
+        return candidate.path;
+      }
+
+      final parent = candidate.parent;
+      if (parent.path == candidate.path) break;
+      candidate = parent;
+    }
+
+    throw FileSystemException(
+      'Could not locate the Radiologist AI project root. '
+      'Start the Windows app from the Flutter project folder.',
+      Directory.current.path,
+    );
   }
 
   String _absolute(String path) {
