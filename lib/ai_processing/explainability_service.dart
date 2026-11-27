@@ -48,6 +48,8 @@ class ChestGradCamResult {
 class ExplainabilityService {
   static const String _engineRelativePath = 'python_engine';
   static const String _modelRelativePath = 'python_engine/models/chest_model.keras';
+  static const String _tfliteRelativePath =
+      'assets/ai_model/chest_model/chest_model.tflite';
   static const String _labelsRelativePath =
       'assets/ai_model/chest_model/chest_labels.json';
 
@@ -79,6 +81,7 @@ class ExplainabilityService {
     final engineDirectory = join(root, _engineRelativePath);
     final scriptPath = join(engineDirectory, 'gradcam_cli.py');
     final modelPath = _absolute(join(root, _modelRelativePath));
+    final tflitePath = _absolute(join(root, _tfliteRelativePath));
     final labelsPath = _absolute(join(root, _labelsRelativePath));
 
     if (!await File(scriptPath).exists()) {
@@ -92,6 +95,9 @@ class ExplainabilityService {
         'Chest Keras model was not found. Copy chest_model.keras into python_engine/models.',
         modelPath,
       );
+    }
+    if (!await File(tflitePath).exists()) {
+      throw FileSystemException('Chest TFLite model was not found.', tflitePath);
     }
     if (!await File(labelsPath).exists()) {
       throw FileSystemException('Chest labels file was not found.', labelsPath);
@@ -121,6 +127,8 @@ class ExplainabilityService {
         scriptPath,
         '--model',
         modelPath,
+        '--tflite-model',
+        tflitePath,
         '--labels',
         labelsPath,
         '--input-tensor',
