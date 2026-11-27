@@ -6,11 +6,11 @@
 لا يُستبدل نموذج TFLite ولا تتغير عملية التشخيص الحالية.
 
 ## الإعداد للمطور على Windows
-1. ثبّت Python 3.10 أو 3.11 أو 3.12 أو 3.13 (64-bit).
+1. ثبّت Python 3.12 (64-bit) كخيار مفضل، أو Python 3.10 أو 3.11 أو 3.13.
 2. افتح مجلد المشروع python_engine.
 3. شغّل setup_windows.bat. التثبيت الأول لمكتبات TensorFlow وPillow يحتاج إنترنت.
-4. انسخ chest_model.keras إلى python_engine/models/chest_model.keras.
-5. شغّل تطبيق Flutter على Windows.
+4. تأكد من وجود Microsoft Visual C++ Redistributable إذا ظهرت أخطاء DLL عند استيراد TensorFlow.\n5. انسخ chest_model.keras إلى python_engine/models/chest_model.keras.
+6. شغّل تطبيق Flutter على Windows.
 
 في وضع التطوير يستخدم Flutter تلقائياً:
 python_engine/.venv/Scripts/python.exe
@@ -55,7 +55,7 @@ flutter run -d windows
 1. اختر صورة أشعة صدر مدعومة.
 2. انتظر انتهاء التشخيص وظهور نتائج Chest.
 3. اضغط زر "عرض خريطة Grad-CAM".
-4. انتظر تحميل نموذج Keras وحساب الخريطة لأول مرة. قد يستغرق ذلك وقتاً أطول من التصنيف العادي.
+4. انتظر إعادة تشغيل TFLite من Python ومقارنة نتيجته بنتيجة Keras، ثم حساب الخريطة. قد يستغرق ذلك وقتاً أطول من التصنيف العادي.
 5. استخدم شريط الشفافية وقارن الخريطة مع صورة الإدخال.
 
 إذا لم يتعرف التطبيق على Python، افتح PowerShell من مجلد المشروع واضبط المتغير قبل التشغيل:
