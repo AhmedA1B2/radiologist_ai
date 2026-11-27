@@ -70,6 +70,10 @@ class _MedicalHeatmapViewState extends State<MedicalHeatmapView> {
                                 value: result.layerName,
                               ),
                               _InfoValue(
+                                title: 'أكبر فرق Keras/TFLite',
+                                value: result.maxAbsProbabilityDifference.toStringAsFixed(5),
+                              ),
+                              _InfoValue(
                                 title: 'أبعاد خريطة الخصائص',
                                 value: result.featureMapShape.join(' × '),
                               ),
@@ -171,6 +175,13 @@ class _MedicalHeatmapViewState extends State<MedicalHeatmapView> {
                             ],
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'متوسط فرق احتمالات Keras وTFLite: ' +
+                            result.meanAbsProbabilityDifference.toStringAsFixed(5),
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
                       const SizedBox(height: 12),
                       Card(
