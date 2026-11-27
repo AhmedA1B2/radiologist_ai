@@ -8,6 +8,8 @@ class ChestGradCamResult {
   final String label;
   final int classIndex;
   final double confidence;
+  final double maxAbsProbabilityDifference;
+  final double meanAbsProbabilityDifference;
   final String layerName;
   final List<int> featureMapShape;
   final String warning;
@@ -34,6 +36,10 @@ class ChestGradCamResult {
       label: json['class_label'] as String,
       classIndex: index,
       confidence: (json['keras_top_confidence'] as num).toDouble(),
+      maxAbsProbabilityDifference:
+          (json['max_abs_probability_difference'] as num? ?? 0).toDouble(),
+      meanAbsProbabilityDifference:
+          (json['mean_abs_probability_difference'] as num? ?? 0).toDouble(),
       layerName: json['layer_name'] as String? ?? 'unknown',
       featureMapShape: (json['feature_map_shape'] as List<dynamic>? ?? const [])
           .map((value) => (value as num).toInt())
