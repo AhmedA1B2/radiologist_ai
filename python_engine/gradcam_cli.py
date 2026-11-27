@@ -117,13 +117,14 @@ def main() -> int:
         description="Generate a Grad-CAM explanation for the Chest Keras model."
     )
     parser.add_argument("--model", required=True, type=Path)
+    parser.add_argument("--tflite-model", required=True, type=Path)
     parser.add_argument("--labels", required=True, type=Path)
     parser.add_argument("--input-tensor", required=True, type=Path)
     parser.add_argument("--class-index", required=True, type=int)
     parser.add_argument("--output-dir", required=True, type=Path)
     args = parser.parse_args()
 
-    for required_file in (args.model, args.labels, args.input_tensor):
+    for required_file in (args.model, args.tflite_model, args.labels, args.input_tensor):
         if not required_file.is_file():
             raise FileNotFoundError(f"Required file not found: {required_file}")
 
@@ -150,6 +151,38 @@ def main() -> int:
     preprocessing_model, feature_model, head_layers, target_layer_name = (
         build_gradcam_graph(model)
     )
+
+    # Re-run the exact TFLite asset used by Flutter on the same float32 input.
+    tflite_interpreter = tf.lite.Interpreter(model_path=str(args.tflite_model))
+    tflite_interpreter.allocate_tensors()
+    tflite_inputs = tflite_interpreter.get_input_details()
+    tflite_outputs = tflite_interpreter.get_output_details()
+    if len(tflite_inputs) != 1 or len(tflite_outputs) != 1:
+        raise RuntimeError("Expected one TFLite input tensor and one output tensor.")
+    if tuple(tflite_inputs[0]["shape"]) != INPUT_SHAPE:
+        raise ValueError(
+            f"TFLite input shape {tflite_inputs[0]['shape']} does not match {INPUT_SHAPE}."
+        )
+    if tflite_inputs[0]["dtype"] != np.float32:
+        raise TypeError(
+            f"TFLite input dtype {tflite_inputs[0]['dtype']} is not float32."
+        )
+    tflite_interpreter.set_tensor(tflite_inputs[0]["index"], input_tensor)
+    tflite_interpreter.invoke()
+    tflite_predictions = np.asarray(
+        tflite_interpreter.get_tensor(tflite_outputs[0]["index"])
+    ).reshape(-1)
+    if tflite_predictions.size != len(labels):
+        raise ValueError(
+            f"TFLite returned {tflite_predictions.size} outputs for {len(labels)} labels."
+        )
+    tflite_top_index = int(np.argmax(tflite_predictions))
+    if tflite_top_index != args.class_index:
+        raise RuntimeError(
+            "Flutter/TFLite re-check mismatch: Flutter selected class index "
+            f"{args.class_index}, but the TFLite asset re-run selected {tflite_top_index}. "
+            "Check that the app is using the same model file and image tensor."
+        )
 
     model_input = np.clip(input_tensor[0], 0, 255).astype(np.uint8)
     model_input_path = args.output_dir / "model_input.png"
@@ -190,12 +223,19 @@ def main() -> int:
 
     if top_index != args.class_index:
         raise RuntimeError(
-            "Keras/TFLite class mismatch: Flutter selected "
+            "Keras/TFLite class mismatch: TFLite selected "
             f"'{labels[args.class_index]}' (index {args.class_index}), while Keras "
             f"predicts '{labels[top_index]}' (index {top_index}). "
             "Grad-CAM was stopped to avoid showing an explanation for a different class. "
             "Check that both model files use the same trained weights."
         )
+
+    max_abs_probability_difference = float(
+        np.max(np.abs(prediction_array - tflite_predictions))
+    )
+    mean_abs_probability_difference = float(
+        np.mean(np.abs(prediction_array - tflite_predictions))
+    )
 
     heatmap_image = Image.fromarray(
         np.clip(cam_array * 255.0, 0, 255).astype(np.uint8),
@@ -218,6 +258,10 @@ def main() -> int:
         "keras_top_class_index": top_index,
         "keras_top_class_label": labels[top_index],
         "keras_top_confidence": float(prediction_array[top_index]),
+        "tflite_top_class_index": tflite_top_index,
+        "tflite_top_class_label": labels[tflite_top_index],
+        "max_abs_probability_difference": max_abs_probability_difference,
+        "mean_abs_probability_difference": mean_abs_probability_difference,
         "predictions": [
             {"index": i, "label": labels[i], "confidence": float(score)}
             for i, score in enumerate(prediction_array)
