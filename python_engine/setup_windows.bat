@@ -34,7 +34,7 @@ if errorlevel 1 goto :error
 
 echo.
 echo Grad-CAM environment is ready.
-echo Copy chest_model.keras to models\chest_model.keras
+echo Copy each specialist Keras file to models\<specialist_model_name>.keras
 pause
 exit /b 0
 
