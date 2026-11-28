@@ -2,91 +2,114 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-class ChestGradCamResult {
+/// One specialist model's Grad-CAM result.
+class GradCamResult {
+  final String specialistModelName;
+  final String overlayPath;
   final String heatmapPath;
   final String modelInputPath;
   final String label;
   final int classIndex;
   final double confidence;
+  final double tfliteScore;
   final double maxAbsProbabilityDifference;
   final double meanAbsProbabilityDifference;
   final String layerName;
   final List<int> featureMapShape;
   final String warning;
+  final String outputDirectoryPath;
 
-  const ChestGradCamResult({
+  const GradCamResult({
+    required this.specialistModelName,
+    required this.overlayPath,
     required this.heatmapPath,
     required this.modelInputPath,
     required this.label,
     required this.classIndex,
     required this.confidence,
+    required this.tfliteScore,
+    required this.maxAbsProbabilityDifference,
+    required this.meanAbsProbabilityDifference,
     required this.layerName,
     required this.featureMapShape,
     required this.warning,
-    required this.maxAbsProbabilityDifference,
-    required this.meanAbsProbabilityDifference,
+    required this.outputDirectoryPath,
   });
 
-  factory ChestGradCamResult.fromJson(Map<String, dynamic> json) {
+  factory GradCamResult.fromJson(
+    Map<String, dynamic> json, {
+    required String outputDirectoryPath,
+  }) {
     final index = (json['class_index'] as num?)?.toInt();
     if (json['status'] != 'ok' || index == null) {
       throw const FormatException(
         'The Grad-CAM engine returned an invalid result.',
       );
     }
-    return ChestGradCamResult(
+
+    return GradCamResult(
+      specialistModelName: json['specialist'] as String,
+      overlayPath: json['overlay_image'] as String,
       heatmapPath: json['heatmap_image'] as String,
       modelInputPath: json['model_input_image'] as String,
       label: json['class_label'] as String,
       classIndex: index,
       confidence: (json['keras_top_confidence'] as num).toDouble(),
+      tfliteScore: (json['tflite_top_score'] as num).toDouble(),
       maxAbsProbabilityDifference:
-          (json['max_abs_probability_difference'] as num? ?? 0).toDouble(),
+          (json['max_abs_probability_difference'] as num).toDouble(),
       meanAbsProbabilityDifference:
-          (json['mean_abs_probability_difference'] as num? ?? 0).toDouble(),
-      layerName: json['layer_name'] as String? ?? 'unknown',
-      featureMapShape: (json['feature_map_shape'] as List<dynamic>? ?? const [])
+          (json['mean_abs_probability_difference'] as num).toDouble(),
+      layerName: json['layer_name'] as String,
+      featureMapShape: (json['feature_map_shape'] as List<dynamic>)
           .map((value) => (value as num).toInt())
           .toList(),
-      warning:
-          json['warning'] as String? ??
-          'Grad-CAM is a visual explanation, not a medical diagnosis.',
+      warning: json['warning'] as String,
+      outputDirectoryPath: outputDirectoryPath,
     );
   }
 }
 
-/// Calls the Grad-CAM Python engine locally. No network/API is used at runtime.
+/// Runs the local Python Grad-CAM engine for the selected specialist model.
+/// The TFLite diagnosis path remains unchanged.
 class ExplainabilityService {
   static const String _engineRelativePath = 'python_engine';
-  static const String _modelRelativePath =
-      'python_engine/models/chest_model.keras';
-  static const String _tfliteRelativePath =
-      'assets/ai_model/chest_model/chest_model.tflite';
-  static const String _labelsRelativePath =
-      'assets/ai_model/chest_model/chest_labels.json';
+  static const Set<String> _supportedModels = {
+    'brain_model',
+    'chest_model',
+    'teeth_model',
+    'knee_model',
+    'liver_model',
+    'hand_model',
+    'elbow_model',
+    'finger_model',
+    'forearm_model',
+    'humerus_model',
+    'shoulder_model',
+    'wrist_model',
+  };
 
-  Future<ChestGradCamResult> generateChestGradCam({
+  final Set<String> _temporaryDirectories = {};
+
+  Future<GradCamResult> generateSpecialistGradCam({
+    required String specialistModelName,
     required List<List<List<List<double>>>> inputTensor,
     required int classIndex,
   }) async {
     if (!Platform.isWindows) {
       throw UnsupportedError(
-        'Chest Grad-CAM integration currently supports Windows desktop only.',
+        'Grad-CAM currently supports Windows desktop only.',
+      );
+    }
+    if (!_supportedModels.contains(specialistModelName)) {
+      throw ArgumentError(
+        'Unsupported Grad-CAM specialist: $specialistModelName',
       );
     }
     if (classIndex < 0) {
-      throw ArgumentError(
-        'The predicted class index is unavailable. Rebuild the project with classIndex support.',
-      );
+      throw ArgumentError('The predicted class index is unavailable.');
     }
-    if (inputTensor.length != 1 ||
-        inputTensor.first.length != 224 ||
-        inputTensor.first.any((row) => row.length != 224) ||
-        inputTensor.first.any((row) => row.any((pixel) => pixel.length != 3))) {
-      throw ArgumentError(
-        'Grad-CAM requires an input tensor with shape [1,224,224,3].',
-      );
-    }
+    _validateInputTensor(inputTensor);
 
     final root = await _findProjectRoot();
     String join(String first, String second) =>
@@ -94,43 +117,43 @@ class ExplainabilityService {
 
     final engineDirectory = join(root, _engineRelativePath);
     final scriptPath = join(engineDirectory, 'gradcam_cli.py');
-    final modelPath = _absolute(join(root, _modelRelativePath));
-    final tflitePath = _absolute(join(root, _tfliteRelativePath));
-    final labelsPath = _absolute(join(root, _labelsRelativePath));
+    final modelPath = _absolute(
+      join(
+        join(engineDirectory, 'models'),
+        '$specialistModelName.keras',
+      ),
+    );
 
-    if (!await File(scriptPath).exists()) {
-      throw FileSystemException(
-        'Grad-CAM Python engine was not found. Run the app from the project root.',
-        scriptPath,
-      );
-    }
-    if (!await File(modelPath).exists()) {
-      throw FileSystemException(
-        'Chest Keras model was not found. Copy chest_model.keras into python_engine/models.',
-        modelPath,
-      );
-    }
-    if (!await File(tflitePath).exists()) {
-      throw FileSystemException(
-        'Chest TFLite model was not found.',
-        tflitePath,
-      );
-    }
-    if (!await File(labelsPath).exists()) {
-      throw FileSystemException('Chest labels file was not found.', labelsPath);
-    }
+    final assetDirectory = join(
+      join(root, 'assets'),
+      join('ai_model', specialistModelName),
+    );
+    final tflitePath = _absolute(
+      join(assetDirectory, '$specialistModelName.tflite'),
+    );
+    final labelsFileName =
+        '${specialistModelName.replaceAll('_model', '_labels')}.json';
+    final labelsPath = _absolute(join(assetDirectory, labelsFileName));
+
+    _requireFile(scriptPath, 'Grad-CAM Python script was not found.');
+    _requireFile(
+      modelPath,
+      'Keras model not found for $specialistModelName. '
+          'Expected python_engine/models/$specialistModelName.keras.',
+    );
+    _requireFile(tflitePath, 'TFLite asset not found for $specialistModelName.');
+    _requireFile(labelsPath, 'Labels file not found for $specialistModelName.');
 
     final pythonOverride = Platform.environment['RADIOLOGIST_AI_PYTHON'];
-    final bundledVenvPython = join(
+    final venvPython = join(
       join(engineDirectory, '.venv'),
-      'Scripts/python.exe',
+      join('Scripts', 'python.exe'),
     );
-    final pythonExecutable =
-        pythonOverride ??
-        (await File(bundledVenvPython).exists() ? bundledVenvPython : 'python');
+    final pythonExecutable = pythonOverride ??
+        (await File(venvPython).exists() ? venvPython : 'python');
 
     final workDirectory = await Directory.systemTemp.createTemp(
-      'radiologist_ai_chest_gradcam_',
+      'radiologist_ai_gradcam_',
     );
     final inputTensorFile = File(join(workDirectory.path, 'input_tensor.bin'));
     final outputDirectory = Directory(join(workDirectory.path, 'output'));
@@ -141,6 +164,8 @@ class ExplainabilityService {
 
       final arguments = <String>[
         scriptPath,
+        '--specialist',
+        specialistModelName,
         '--model',
         modelPath,
         '--tflite-model',
@@ -195,21 +220,33 @@ class ExplainabilityService {
           'Grad-CAM result JSON has an unexpected format.',
         );
       }
-      final result = ChestGradCamResult.fromJson(decoded);
 
-      if (result.classIndex != classIndex) {
+      final result = GradCamResult.fromJson(
+        decoded,
+        outputDirectoryPath: workDirectory.path,
+      );
+
+      if (result.specialistModelName != specialistModelName ||
+          result.classIndex != classIndex) {
         throw StateError(
-          'Grad-CAM returned class ${result.classIndex}, but Flutter requested $classIndex.',
-        );
-      }
-      if (!await File(result.heatmapPath).exists() ||
-          !await File(result.modelInputPath).exists()) {
-        throw const FileSystemException(
-          'The Grad-CAM engine did not create the expected image files.',
+          'Grad-CAM returned a result for a different model or class.',
         );
       }
 
-      // Keep the temporary output directory alive while the viewer is open.
+      for (final path in [
+        result.overlayPath,
+        result.heatmapPath,
+        result.modelInputPath,
+      ]) {
+        if (!await File(path).exists()) {
+          throw FileSystemException(
+            'Grad-CAM output image was not created.',
+            path,
+          );
+        }
+      }
+
+      _temporaryDirectories.add(workDirectory.path);
       return result;
     } catch (_) {
       if (await workDirectory.exists()) {
@@ -219,15 +256,35 @@ class ExplainabilityService {
     }
   }
 
+  void _validateInputTensor(
+    List<List<List<List<double>>>> tensor,
+  ) {
+    if (tensor.length != 1 ||
+        tensor.first.length != 224 ||
+        tensor.first.any((row) => row.length != 224) ||
+        tensor.first.any((row) => row.any((pixel) => pixel.length != 3))) {
+      throw ArgumentError(
+        'Grad-CAM currently requires the app tensor shape [1,224,224,3].',
+      );
+    }
+
+    for (final row in tensor.first) {
+      for (final pixel in row) {
+        for (final value in pixel) {
+          if (!value.isFinite) {
+            throw ArgumentError('Input tensor contains a non-finite value.');
+          }
+        }
+      }
+    }
+  }
+
   Uint8List _encodeTensor(List<List<List<List<double>>>> tensor) {
     final values = tensor.first.expand((row) => row).expand((pixel) => pixel);
     final bytes = ByteData(224 * 224 * 3 * 4);
     var index = 0;
 
     for (final value in values) {
-      if (!value.isFinite) {
-        throw ArgumentError('Input tensor contains a non-finite value.');
-      }
       bytes.setFloat32(index * 4, value, Endian.little);
       index++;
     }
@@ -238,17 +295,24 @@ class ExplainabilityService {
     return bytes.buffer.asUint8List();
   }
 
+  void _requireFile(String path, String message) {
+    if (!File(path).existsSync()) {
+      throw FileSystemException(message, path);
+    }
+  }
+
   Future<String> _findProjectRoot() async {
     var candidate = Directory.current.absolute;
+
     while (true) {
       final separator = Platform.pathSeparator;
       final candidateScript =
           '${candidate.path}${separator}python_engine${separator}gradcam_cli.py';
-      final candidateLabels =
-          '${candidate.path}${separator}assets${separator}ai_model${separator}chest_model${separator}chest_labels.json';
+      final candidateAssets =
+          '${candidate.path}${separator}assets${separator}ai_model';
 
       if (await File(candidateScript).exists() &&
-          await File(candidateLabels).exists()) {
+          await Directory(candidateAssets).exists()) {
         return candidate.path;
       }
 
@@ -264,7 +328,22 @@ class ExplainabilityService {
     );
   }
 
-  String _absolute(String path) {
-    return File(path).absolute.path;
+  String _absolute(String path) => File(path).absolute.path;
+
+  /// Remove generated local files when a new case is selected or the page closes.
+  Future<void> clearTemporaryFiles() async {
+    final directories = _temporaryDirectories.toList();
+    _temporaryDirectories.clear();
+
+    for (final path in directories) {
+      try {
+        final directory = Directory(path);
+        if (await directory.exists()) {
+          await directory.delete(recursive: true);
+        }
+      } catch (_) {
+        // Temporary files are best-effort cleanup only.
+      }
+    }
   }
 }
