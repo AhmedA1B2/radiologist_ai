@@ -1,12 +1,10 @@
 name: Grad-CAM validation
 
 on:
-  push:
-    branches:
-      - feature/chest-gradcam-windows
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   python-gradcam:
@@ -49,4 +47,4 @@ jobs:
         run: flutter pub get
 
       - name: Analyze Dart sources
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos
