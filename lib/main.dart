@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:radiologist_ai/auth/log_in.dart';
 import 'package:radiologist_ai/core/theme/app_colors.dart';
+import 'package:radiologist_ai/core/app_preferences.dart';
 import 'package:radiologist_ai/dashboard/main_dashboard.dart';
 import 'package:radiologist_ai/dashboard/view_dashboard.dart';
 import 'package:radiologist_ai/pages/about_page.dart';
 import 'package:radiologist_ai/pages/settings_page.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppPreferences.load();
   runApp(const MedicalXRayApp());
 }
 
