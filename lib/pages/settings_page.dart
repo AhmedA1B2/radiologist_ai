@@ -34,12 +34,13 @@ class _SettingsPageState extends State<SettingsPage> {
         const SnackBar(content: Text('تم حفظ الإعداد بنجاح.')),
       );
     } catch (error) {
+      // Restore the in-memory value even if the settings page was closed
+      // while the asynchronous file write was running.
+      updateValue(previousValue);
+      AppPreferences.notifyChanged();
+
       if (!mounted) return;
-      setState(() {
-        updateValue(previousValue);
-        AppPreferences.notifyChanged();
-        _saving = false;
-      });
+      setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('تعذر حفظ الإعداد، تمت إعادة قيمته السابقة. $error'),
@@ -111,20 +112,17 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       );
     } catch (error) {
+      AppPreferences.includeXrayImageInPdf =
+          previousValues['includeXrayImageInPdf']!;
+      AppPreferences.includeGradCamInPdf =
+          previousValues['includeGradCamInPdf']!;
+      AppPreferences.showModelScores = previousValues['showModelScores']!;
+      AppPreferences.confirmBeforeDelete =
+          previousValues['confirmBeforeDelete']!;
+      AppPreferences.notifyChanged();
+
       if (!mounted) return;
-
-      setState(() {
-        AppPreferences.includeXrayImageInPdf =
-            previousValues['includeXrayImageInPdf']!;
-        AppPreferences.includeGradCamInPdf =
-            previousValues['includeGradCamInPdf']!;
-        AppPreferences.showModelScores = previousValues['showModelScores']!;
-        AppPreferences.confirmBeforeDelete =
-            previousValues['confirmBeforeDelete']!;
-        AppPreferences.notifyChanged();
-        _saving = false;
-      });
-
+      setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('تعذرت إعادة ضبط الإعدادات وحفظها: $error'),
