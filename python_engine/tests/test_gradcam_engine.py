@@ -35,7 +35,7 @@ class GradCamGraphTests(unittest.TestCase):
         x = tf.keras.layers.Conv2D(8, 3, activation="relu")(inputs)
         x = tf.keras.layers.Conv2D(8, 3, activation="relu")(x)
         x = tf.keras.layers.GlobalAveragePooling2D()(x)
-        outputs = tf.keras.layers.Dense(3, activation="softmax")(x)
+        outputs = tf.keras.layers.Dense(3, kernel_initializer="ones")(x)
         model = tf.keras.Model(inputs, outputs)
 
         forward, layer_name, data_format = gradcam_cli.build_forward_graph(model)
@@ -59,7 +59,7 @@ class GradCamGraphTests(unittest.TestCase):
         model_input = tf.keras.Input(shape=(32, 32, 3))
         x = backbone(model_input)
         x = tf.keras.layers.Dropout(0.1)(x)
-        output = tf.keras.layers.Dense(3, activation="softmax")(x)
+        output = tf.keras.layers.Dense(3, kernel_initializer="ones")(x)
         model = tf.keras.Model(model_input, output)
 
         forward, layer_name, data_format = gradcam_cli.build_forward_graph(model)
