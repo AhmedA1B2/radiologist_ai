@@ -49,10 +49,14 @@ def static_nhwc_shape(model: tf.keras.Model) -> tuple[int, int, int, int]:
         if len(shape) != 1:
             raise ValueError(f"Only one model input is supported; got {shape}.")
         shape = shape[0]
-    if shape is None or len(shape) != 4 or any(v is None for v in shape):
-        raise ValueError(f"Model input must have a fixed NHWC rank-4 shape; got {shape}.")
-    result = tuple(int(v) for v in shape)
-    if result[0] != 1 or result[-1] not in (1, 3, 4):
+    if shape is None or len(shape) != 4:
+        raise ValueError(f"Model input must have an NHWC rank-4 shape; got {shape}.")
+    # Keras commonly leaves the batch dimension dynamic (None); this app
+    # supplies exactly one image, so normalize that dimension to 1.
+    if shape[0] not in (None, 1) or any(v is None for v in shape[1:]):
+        raise ValueError(f"Model spatial input dimensions must be fixed; got {shape}.")
+    result = (1, int(shape[1]), int(shape[2]), int(shape[3]))
+    if result[-1] not in (1, 3, 4):
         raise ValueError(
             f"Expected batch size 1 and channels-last input; got {result}. "
             "This Flutter integration currently sends RGB NHWC images."
@@ -153,7 +157,8 @@ def build_forward_graph(model: tf.keras.Model):
             return activations, one_tensor(value, "Reconstructed classifier output")
 
         layer_name = f"{nested.name}/{target.name}"
-        return nested_forward, layer_name
+        data_format = getattr(target, "data_format", None) or tf.keras.backend.image_data_format()
+        return nested_forward, layer_name, data_format
 
     # Standard top-level graph. This also covers a nested feature extractor
     # whose exposed output itself is a spatial feature map.
@@ -174,7 +179,8 @@ def build_forward_graph(model: tf.keras.Model):
         activations, predictions = grad_model(input_tensor, training=False)
         return activations, one_tensor(predictions, "Model output")
 
-    return direct_forward, target.name
+    data_format = getattr(target, "data_format", None) or tf.keras.backend.image_data_format()
+    return direct_forward, target.name, data_format
 
 
 def read_input_tensor(path: Path, expected_shape: tuple[int, int, int, int]) -> np.ndarray:
@@ -224,7 +230,12 @@ def jet_colormap(gray: np.ndarray) -> np.ndarray:
     return (np.stack([red, green, blue], axis=-1) * 255.0).astype(np.uint8)
 
 
-def compute_gradcam(forward, input_tensor: np.ndarray, class_index: int):
+def compute_gradcam(
+    forward,
+    input_tensor: np.ndarray,
+    class_index: int,
+    data_format: str,
+):
     tensor = tf.convert_to_tensor(input_tensor, dtype=tf.float32)
     with tf.GradientTape() as tape:
         activations, predictions = forward(tensor)
@@ -248,7 +259,6 @@ def compute_gradcam(forward, input_tensor: np.ndarray, class_index: int):
         raise ValueError(f"Selected feature layer is not rank 4: {activations.shape}.")
 
     # Respect the selected layer's data format.
-    data_format = getattr(tf.keras.backend, "image_data_format", lambda: "channels_last")()
     if data_format == "channels_first":
         weights = tf.reduce_mean(gradients, axis=(2, 3))
         cam = tf.reduce_sum(activations[0] * weights[0][:, None, None], axis=0)
@@ -309,7 +319,7 @@ def main() -> int:
             f"Keras outputs {output_shape[-1]} classes but labels contain {len(labels)}."
         )
 
-    forward, target_layer_name = build_forward_graph(model)
+    forward, target_layer_name, target_data_format = build_forward_graph(model)
 
     # Prove the reconstructed forward graph reproduces the saved Keras model.
     baseline = one_tensor(model(tf.convert_to_tensor(input_tensor), training=False), "Model output")
@@ -367,7 +377,7 @@ def main() -> int:
         )
 
     cam_array, prediction_array, feature_map_shape = compute_gradcam(
-        forward, input_tensor, args.class_index
+        forward, input_tensor, args.class_index, target_data_format
     )
     if int(np.argmax(prediction_array)) != args.class_index:
         raise RuntimeError("Grad-CAM forward pass class does not match the selected class.")
@@ -396,7 +406,7 @@ def main() -> int:
         original_image.convert("RGBA"),
         Image.fromarray(heatmap_rgba, mode="RGBA"),
     ).convert("RGB")
-    overlay.save(overlay_path, quality=95)
+    overlay.save(overlay_path)
 
     max_abs_difference = float(np.max(np.abs(prediction_array - tflite_scores)))
     mean_abs_difference = float(np.mean(np.abs(prediction_array - tflite_scores)))
