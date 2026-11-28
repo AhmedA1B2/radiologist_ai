@@ -1,9 +1,12 @@
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 import 'package:radiologist_ai/ai_processing/diagnostic_result.dart';
+import 'package:radiologist_ai/ai_processing/explainability_service.dart';
+import 'package:radiologist_ai/widgets/medical_heatmap_view.dart';
 import 'package:radiologist_ai/ai_processing/image_pre_processor.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:radiologist_ai/api/send_diagnosis.dart';
@@ -11,6 +14,7 @@ import 'package:radiologist_ai/body_of_main_view/header.dart';
 import 'package:radiologist_ai/body_of_main_view/models/process_step.dart';
 import 'package:radiologist_ai/body_of_main_view/sidebar.dart';
 import 'package:radiologist_ai/core/theme/app_colors.dart';
+import 'package:radiologist_ai/core/app_preferences.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:radiologist_ai/customs/custom_dialogue/custom_dialogue.dart';
@@ -24,6 +28,7 @@ class MainDashboard extends StatefulWidget {
 
 class _MainDashboardState extends State<MainDashboard> {
   final AIPipelineService _aiService = AIPipelineService();
+  final ExplainabilityService _explainabilityService = ExplainabilityService();
 
   final TextEditingController numController = TextEditingController();
 
@@ -36,6 +41,11 @@ class _MainDashboardState extends State<MainDashboard> {
   DiagnosticResult? _routerResult;
 
   List<DiagnosticResult>? _finalResults;
+
+  List<List<List<List<double>>>>? _lastInputTensor;
+  bool _isGeneratingGradCam = false;
+  String? _gradCamError;
+  GradCamResult? _gradCamResult;
 
   bool showCustomDialogue = false;
 
@@ -83,10 +93,33 @@ class _MainDashboardState extends State<MainDashboard> {
     try {
       final pdf = pw.Document();
 
-      // قراءة صورة الأشعة
-      pw.MemoryImage? xrayImage;
+      // Generate the explanation only when the user enabled the PDF option.
+      GradCamResult? pdfGradCamResult;
+      pw.MemoryImage? gradCamInputImage;
+      pw.MemoryImage? gradCamOverlayImage;
 
-      if (_selectedImage != null && await _selectedImage!.exists()) {
+      if (AppPreferences.includeGradCamInPdf) {
+        // A failed verification aborts PDF creation instead of attaching an
+        // unrelated or unverified heatmap.
+        pdfGradCamResult = await _ensureGradCam();
+        final inputFile = File(pdfGradCamResult.modelInputPath);
+        final overlayFile = File(pdfGradCamResult.overlayPath);
+
+        if (!await inputFile.exists() || !await overlayFile.exists()) {
+          throw const FileSystemException(
+            'Grad-CAM images are no longer available. Generate the explanation again.',
+          );
+        }
+
+        gradCamInputImage = pw.MemoryImage(await inputFile.readAsBytes());
+        gradCamOverlayImage = pw.MemoryImage(await overlayFile.readAsBytes());
+      }
+
+      // Attach the original X-ray only when its corresponding setting is on.
+      pw.MemoryImage? xrayImage;
+      if (AppPreferences.includeXrayImageInPdf &&
+          _selectedImage != null &&
+          await _selectedImage!.exists()) {
         final imageBytes = await _selectedImage!.readAsBytes();
         xrayImage = pw.MemoryImage(imageBytes);
       }
@@ -257,6 +290,93 @@ class _MainDashboardState extends State<MainDashboard> {
                 ),
               ),
 
+              pw.SizedBox(height: 20),
+            ],
+
+            // Model explanation: original model input and Grad-CAM overlay.
+            if (gradCamInputImage != null &&
+                gradCamOverlayImage != null &&
+                pdfGradCamResult != null) ...[
+              pw.Text(
+                'MODEL EXPLANATION — GRAD-CAM',
+                style: pw.TextStyle(
+                  fontSize: 13,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.cyan800,
+                ),
+              ),
+              pw.SizedBox(height: 8),
+              pw.Text(
+                'Specialist model: ${pdfGradCamResult.specialistModelName}',
+                style: const pw.TextStyle(fontSize: 9),
+              ),
+              pw.SizedBox(height: 10),
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Expanded(
+                    child: pw.Column(
+                      children: [
+                        pw.Text(
+                          'MODEL INPUT',
+                          style: pw.TextStyle(
+                            fontSize: 9,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        pw.SizedBox(height: 6),
+                        pw.Image(
+                          gradCamInputImage,
+                          height: 190,
+                          fit: pw.BoxFit.contain,
+                        ),
+                      ],
+                    ),
+                  ),
+                  pw.SizedBox(width: 12),
+                  pw.Expanded(
+                    child: pw.Column(
+                      children: [
+                        pw.Text(
+                          'GRAD-CAM OVERLAY',
+                          style: pw.TextStyle(
+                            fontSize: 9,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        pw.SizedBox(height: 6),
+                        pw.Image(
+                          gradCamOverlayImage,
+                          height: 190,
+                          fit: pw.BoxFit.contain,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 8),
+              pw.Text(
+                'Explained class: ${pdfGradCamResult.label} '
+                '(${(pdfGradCamResult.confidence * 100).toStringAsFixed(2)}%)',
+                style: const pw.TextStyle(fontSize: 9),
+              ),
+              pw.Text(
+                'Target feature layer: ${pdfGradCamResult.layerName}',
+                style: const pw.TextStyle(fontSize: 9),
+              ),
+              pw.Text(
+                'Feature map shape: ${pdfGradCamResult.featureMapShape.join(' × ')}',
+                style: const pw.TextStyle(fontSize: 9),
+              ),
+              pw.SizedBox(height: 6),
+              pw.Text(
+                pdfGradCamResult.warning,
+                style: const pw.TextStyle(
+                  fontSize: 8,
+                  color: PdfColors.grey700,
+                ),
+              ),
               pw.SizedBox(height: 20),
             ],
 
@@ -544,7 +664,8 @@ class _MainDashboardState extends State<MainDashboard> {
     // منع اختيار صورة أثناء المعالجة
     if (_currentStep == ProcessStep.routing ||
         _currentStep == ProcessStep.diagnosing ||
-        _currentStep == ProcessStep.loadingSpecialist) {
+        _currentStep == ProcessStep.loadingSpecialist ||
+        _isGeneratingGradCam) {
       return;
     }
 
@@ -560,6 +681,10 @@ class _MainDashboardState extends State<MainDashboard> {
 
       final selectedFile = File(result.files.single.path!);
 
+      // Remove the previous case's temporary explanation files.
+      await _explainabilityService.clearTemporaryFiles();
+      _gradCamResult = null;
+
       if (!mounted) return;
 
       setState(() {
@@ -567,6 +692,8 @@ class _MainDashboardState extends State<MainDashboard> {
         _currentStep = ProcessStep.routing;
         _routerResult = null;
         _finalResults = null;
+        _lastInputTensor = null;
+        _gradCamError = null;
         _statusMessage = "1. جاري معالجة الصورة والتوجيه...";
       });
 
@@ -574,6 +701,7 @@ class _MainDashboardState extends State<MainDashboard> {
       final inputTensor = await ImagePreProcessor.processImageAsTensor(
         selectedFile.path,
       );
+      _lastInputTensor = inputTensor;
 
       if (!mounted) return;
 
@@ -650,6 +778,93 @@ class _MainDashboardState extends State<MainDashboard> {
     }
   }
 
+
+  // ============================================================
+  // SPECIALIST GRAD-CAM (OPTIONAL EXPLANATION)
+  // ============================================================
+
+  Future<GradCamResult> _ensureGradCam() async {
+    final cached = _gradCamResult;
+    if (cached != null) return cached;
+
+    if (_isGeneratingGradCam) {
+      throw StateError('Grad-CAM is already being generated.');
+    }
+
+    final inputTensor = _lastInputTensor;
+    final specialistModelName = _aiService.currentSpecialistName;
+    final results = _finalResults;
+
+    if (inputTensor == null ||
+        specialistModelName == null ||
+        results == null ||
+        results.isEmpty) {
+      throw StateError(
+        'A completed specialist diagnosis is required before Grad-CAM.',
+      );
+    }
+
+    final classIndex = results.first.classIndex;
+    if (classIndex < 0) {
+      throw StateError(
+        'The original output class index is unavailable. '
+        'Rebuild the app with classIndex support.',
+      );
+    }
+
+    if (mounted) {
+      setState(() {
+        _isGeneratingGradCam = true;
+        _gradCamError = null;
+      });
+    }
+
+    try {
+      final generated = await _explainabilityService.generateSpecialistGradCam(
+        specialistModelName: specialistModelName,
+        inputTensor: inputTensor,
+        classIndex: classIndex,
+      );
+
+      _gradCamResult = generated;
+      if (mounted) {
+        setState(() => _gradCamError = null);
+      }
+      return generated;
+    } catch (error, stackTrace) {
+      _logDiagnosticError('SPECIALIST GRAD-CAM ERROR', error, stackTrace);
+      if (mounted) {
+        setState(() => _gradCamError = error.toString());
+      }
+      rethrow;
+    } finally {
+      if (mounted) {
+        setState(() => _isGeneratingGradCam = false);
+      }
+    }
+  }
+
+  Future<void> _showGradCam() async {
+    try {
+      final result = await _ensureGradCam();
+      if (!mounted) return;
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => MedicalHeatmapView(result: result),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تعذر إنشاء خريطة Grad-CAM: $error'),
+          duration: const Duration(seconds: 8),
+        ),
+      );
+    }
+  }
+
   // ============================================================
   // DISPOSE
   // ============================================================
@@ -658,6 +873,7 @@ class _MainDashboardState extends State<MainDashboard> {
   void dispose() {
     numController.dispose();
     _aiService.dispose();
+    unawaited(_explainabilityService.clearTemporaryFiles());
     super.dispose();
   }
 
@@ -788,6 +1004,7 @@ class _MainDashboardState extends State<MainDashboard> {
 
                   // 2. إرسال PDF وصورة الأشعة إلى السيرفر
                   final success = await SendDiagnosis().addDiagnosi(
+                    // ignore: use_build_context_synchronously
                     context,
                     numController.text.trim(),
                     DateTime.now().toString(),
@@ -802,6 +1019,7 @@ class _MainDashboardState extends State<MainDashboard> {
                       numController.clear();
                     });
 
+                    // ignore: use_build_context_synchronously
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text(
@@ -811,10 +1029,12 @@ class _MainDashboardState extends State<MainDashboard> {
                     );
                   }
                 } catch (e) {
+                  // ignore: avoid_print
                   print("Save diagnosis error: $e");
 
                   if (!mounted) return;
 
+                  // ignore: use_build_context_synchronously
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
@@ -1086,6 +1306,13 @@ class _MainDashboardState extends State<MainDashboard> {
   // ============================================================
 
   Widget _buildResultsPanel() {
+    return ValueListenableBuilder<int>(
+      valueListenable: AppPreferences.revision,
+      builder: (context, revision, child) => _buildResultsPanelContent(),
+    );
+  }
+
+  Widget _buildResultsPanelContent() {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -1223,8 +1450,10 @@ class _MainDashboardState extends State<MainDashboard> {
                   ),
 
                   child: Text(
-                    "${_routerResult!.label} "
-                    "(ثقة: ${(_routerResult!.confidence * 100).toStringAsFixed(1)}%)",
+                    AppPreferences.showModelScores
+                        ? "${_routerResult!.label} "
+                            "(ثقة: ${(_routerResult!.confidence * 100).toStringAsFixed(1)}%)"
+                        : _routerResult!.label,
                     style: const TextStyle(
                       color: AppColors.cyanAccent,
                       fontWeight: FontWeight.bold,
@@ -1279,26 +1508,28 @@ class _MainDashboardState extends State<MainDashboard> {
                                     ),
                                   ),
 
-                                  Text(
-                                    "${(result.confidence * 100).toStringAsFixed(1)}%",
-                                    style: const TextStyle(
-                                      color: AppColors.textSecondary,
+                                  if (AppPreferences.showModelScores)
+                                    Text(
+                                      "${(result.confidence * 100).toStringAsFixed(1)}%",
+                                      style: const TextStyle(
+                                        color: AppColors.textSecondary,
+                                      ),
                                     ),
-                                  ),
                                 ],
                               ),
 
-                              const SizedBox(height: 8),
-
-                              LinearProgressIndicator(
-                                value: result.confidence,
-                                backgroundColor: AppColors.navyDark,
-                                color: index == 0
-                                    ? AppColors.cyanAccent
-                                    : Colors.white38,
-                                minHeight: 12,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
+                              if (AppPreferences.showModelScores) ...[
+                                const SizedBox(height: 8),
+                                LinearProgressIndicator(
+                                  value: result.confidence.clamp(0.0, 1.0),
+                                  backgroundColor: AppColors.navyDark,
+                                  color: index == 0
+                                      ? AppColors.cyanAccent
+                                      : Colors.white38,
+                                  minHeight: 12,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ],
                             ],
                           ),
                         );
@@ -1321,6 +1552,49 @@ class _MainDashboardState extends State<MainDashboard> {
                 ),
               ),
             ),
+
+
+          // Grad-CAM is available for a completed supported specialist diagnosis.
+          if (_aiService.currentSpecialistName != null &&
+              _routerResult?.label.trim().toLowerCase() != 'other' &&
+              _finalResults != null &&
+              _finalResults!.isNotEmpty &&
+              _currentStep == ProcessStep.complete) ...[
+            const Divider(color: Colors.white24, height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isGeneratingGradCam || _lastInputTensor == null
+                    ? null
+                    : _showGradCam,
+                icon: _isGeneratingGradCam
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.local_fire_department_outlined),
+                label: Text(
+                  _isGeneratingGradCam
+                      ? 'جاري إنشاء الخريطة الحرارية...'
+                      : 'عرض خريطة Grad-CAM',
+                ),
+              ),
+            ),
+            if (_gradCamError != null) ...[
+              const SizedBox(height: 8),
+              SelectableText(
+                _gradCamError!,
+                style: const TextStyle(
+                  color: Colors.orangeAccent,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ],
 
           // زر الطباعة: يظهر فقط عند وجود نتائج فعلية
           if (_finalResults != null &&

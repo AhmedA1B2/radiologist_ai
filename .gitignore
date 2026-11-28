@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local Grad-CAM Python environment and private model weights
+/python_engine/.venv/
+/python_engine/models/*.keras
+/python_engine/models/*.h5

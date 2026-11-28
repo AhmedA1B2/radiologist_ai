@@ -10,7 +10,15 @@ class DiagnosticResult {
   final String label;
   final double confidence;
 
-  const DiagnosticResult(this.label, this.confidence);
+  /// Original index in the model output before sorting by confidence.
+  /// Kept so explanation tools target the exact predicted class.
+  final int classIndex;
+
+  const DiagnosticResult(
+    this.label,
+    this.confidence, {
+    this.classIndex = -1,
+  });
 }
 
 /// يدير نموذج التوجيه والنموذج التخصصي الذي يتم تحميله حسب نوع الأشعة.
@@ -193,7 +201,7 @@ class AIPipelineService {
         }
       }
 
-      final result = DiagnosticResult(labels[maxIndex], maxProbability);
+      final result = DiagnosticResult(labels[maxIndex], maxProbability, classIndex: maxIndex);
       _log('نتيجة الموجه: ${result.label}، الثقة=${result.confidence}.');
       return result;
     } catch (error, stackTrace) {
@@ -277,7 +285,7 @@ class AIPipelineService {
 
       final results = <DiagnosticResult>[];
       for (var i = 0; i < probabilities.length; i++) {
-        results.add(DiagnosticResult(labels[i], probabilities[i]));
+        results.add(DiagnosticResult(labels[i], probabilities[i], classIndex: i));
       }
       results.sort((a, b) => b.confidence.compareTo(a.confidence));
 
