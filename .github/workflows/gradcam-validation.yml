@@ -67,5 +67,8 @@ jobs:
       - name: Resolve packages
         run: flutter pub get
 
+      - name: Run Flutter tests
+        run: flutter test
+
       - name: Analyze Dart sources
         run: flutter analyze --no-fatal-infos
