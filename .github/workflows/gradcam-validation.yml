@@ -30,6 +30,27 @@ jobs:
       - name: Test direct and nested CNN Grad-CAM graphs
         run: python -m unittest discover -s python_engine/tests -v
 
+  python-gradcam-windows:
+    name: Windows Python Grad-CAM graph tests
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Grad-CAM dependencies
+        run: python -m pip install -r python_engine/requirements.txt
+
+      - name: Compile Python sources
+        run: python -m compileall -q python_engine
+
+      - name: Test direct and nested CNN Grad-CAM graphs
+        run: python -m unittest discover -s python_engine/tests -v
+
   flutter-analysis:
     name: Flutter static analysis
     runs-on: ubuntu-latest
