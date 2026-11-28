@@ -99,7 +99,7 @@ cd python_engine
 python -m unittest discover -s python_engine/tests -v
 ```
 
-كما ينفّذ GitHub Actions اختبارات الشبكات التجريبية وتحليل Flutter عند تحديث الفرع.
+كما ينفّذ GitHub Actions اختبارات الشبكات التجريبية على Linux وWindows، إضافة إلى تحليل Flutter، عند تحديث طلب السحب.
 
 ## حدود التفسير الطبي
 
