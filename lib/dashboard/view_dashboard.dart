@@ -82,6 +82,44 @@ class _ViewDashboardState extends State<ViewDashboard> {
     }
   }
 
+  final List<DiagnosticRecord> _records = [];
+  final Set<int> _deletingRecordIds = {};
+
+  String _searchText = '';
+
+  List<DiagnosticRecord> get _filteredRecords {
+    if (_searchText.trim().isEmpty) {
+      return _records;
+    }
+
+    final query = _searchText.trim().toLowerCase();
+
+    return _records.where((record) {
+      return record.patientId.toString().contains(query) ||
+          record.file.toLowerCase().contains(query);
+    }).toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    _searchController.addListener(() {
+      if (!mounted) return;
+      setState(() {
+        _searchText = _searchController.text;
+      });
+    });
+
+    getViewRecords();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _deleteRecord(DiagnosticRecord record) async {
     final diagnosisId = record.diagnosisId;
 
