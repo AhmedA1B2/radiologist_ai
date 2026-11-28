@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:radiologist_ai/ai_processing/explainability_service.dart';
 
 class MedicalHeatmapView extends StatefulWidget {
-  final ChestGradCamResult result;
+  final GradCamResult result;
 
   const MedicalHeatmapView({
     super.key,
@@ -25,7 +25,7 @@ class _MedicalHeatmapViewState extends State<MedicalHeatmapView> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('التفسير البصري — Chest Grad-CAM'),
+        title: Text('التفسير البصري — ${result.specialistModelName.replaceAll('_model', '').toUpperCase()} Grad-CAM'),
         actions: [
           Padding(
             padding: const EdgeInsetsDirectional.only(end: 16),
