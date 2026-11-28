@@ -7,6 +7,7 @@ class AppPreferences {
   AppPreferences._();
 
   static bool includeXrayImageInPdf = true;
+  static bool includeGradCamInPdf = false;
   static bool showModelScores = true;
   static bool confirmBeforeDelete = true;
 
@@ -54,6 +55,9 @@ class AppPreferences {
       includeXrayImageInPdf = decoded['includeXrayImageInPdf'] is bool
           ? decoded['includeXrayImageInPdf'] as bool
           : true;
+      includeGradCamInPdf = decoded['includeGradCamInPdf'] is bool
+          ? decoded['includeGradCamInPdf'] as bool
+          : false;
       showModelScores = decoded['showModelScores'] is bool
           ? decoded['showModelScores'] as bool
           : true;
@@ -71,6 +75,7 @@ class AppPreferences {
       await file.writeAsString(
         const JsonEncoder.withIndent('  ').convert({
           'includeXrayImageInPdf': includeXrayImageInPdf,
+          'includeGradCamInPdf': includeGradCamInPdf,
           'showModelScores': showModelScores,
           'confirmBeforeDelete': confirmBeforeDelete,
         }),
@@ -83,6 +88,7 @@ class AppPreferences {
 
   static Future<void> reset() async {
     includeXrayImageInPdf = true;
+    includeGradCamInPdf = false;
     showModelScores = true;
     confirmBeforeDelete = true;
     await save();
