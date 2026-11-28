@@ -403,7 +403,7 @@ class _SettingsPageState extends State<SettingsPage> {
     required String title,
     required String description,
     required bool value,
-    required ValueChanged<bool> onChanged,
+    required ValueChanged<bool>? onChanged,
     bool warning = false,
   }) {
     return Container(
