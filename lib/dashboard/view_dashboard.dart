@@ -3,6 +3,7 @@ import 'package:radiologist_ai/api/crud.dart';
 import 'package:radiologist_ai/api/links.dart';
 import 'package:radiologist_ai/body_of_main_view/sidebar.dart';
 import 'package:radiologist_ai/core/theme/app_colors.dart';
+import 'package:radiologist_ai/core/app_preferences.dart';
 import 'package:radiologist_ai/main.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -81,75 +82,15 @@ class _ViewDashboardState extends State<ViewDashboard> {
     }
   }
 
-  Future<void> deleteRecord(String diagnosisId) async {
-    try {
-      //
-      var response = await _crud.postRequest(linkAiResultDelete, {
-        "diagnosis_id": diagnosisId,
-      });
-      //
+  Future<void> _deleteRecord(DiagnosticRecord record) async {
+    final diagnosisId = record.diagnosisId;
 
-      if (response['status'] == "success") {
-        setState(() {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Success')));
-        });
-      } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Fail')));
-        return;
-      }
-    } catch (e) {
-      print("catch error ====> $e");
-    }
-  }
+    if (_deletingRecordIds.contains(diagnosisId)) return;
 
-  ///////////////////////////////////////////////////////
-  ///
-
-  final List<DiagnosticRecord> _records = [];
-
-  String _searchText = '';
-
-  List<DiagnosticRecord> get _filteredRecords {
-    if (_searchText.trim().isEmpty) {
-      return _records;
-    }
-
-    final query = _searchText.trim().toLowerCase();
-
-    return _records.where((record) {
-      return record.patientId.toString().contains(query) ||
-          record.file.toLowerCase().contains(query);
-    }).toList();
-  }
-
-  @override
-  void initState() {
-    super.initState();
-
-    _searchController.addListener(() {
-      setState(() {
-        _searchText = _searchController.text;
-      });
-    });
-
-    getViewRecords();
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _deleteRecord(DiagnosticRecord record) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return Directionality(
+    if (AppPreferences.confirmBeforeDelete) {
+      final shouldDelete = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
             backgroundColor: AppColors.slateGrey,
@@ -164,7 +105,7 @@ class _ViewDashboardState extends State<ViewDashboard> {
               ),
             ),
             content: Text(
-              'هل أنت متأكد من أنك تريد حذف تقرير المريض رقم ${record.patientId}؟\n\nلا يمكن التراجع عن هذه العملية.',
+              'هل أنت متأكد من أنك تريد حذف تقرير المريض رقم ${record.patientId}؟\\n\\nلا يمكن التراجع عن هذه العملية.',
               style: const TextStyle(
                 color: AppColors.textSecondary,
                 height: 1.6,
@@ -172,7 +113,7 @@ class _ViewDashboardState extends State<ViewDashboard> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => Navigator.pop(dialogContext, false),
                 child: const Text(
                   'إلغاء',
                   style: TextStyle(color: AppColors.textSecondary),
@@ -191,30 +132,56 @@ class _ViewDashboardState extends State<ViewDashboard> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                onPressed: () {
-                  deleteRecord(record.diagnosisId.toString());
-                  Navigator.pop(context);
-
-                  setState(() {
-                    _records.remove(record);
-                  });
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'تم حذف التقرير بنجاح',
-                        textAlign: TextAlign.right,
-                      ),
-                    ),
-                  );
-                },
+                onPressed: () => Navigator.pop(dialogContext, true),
                 child: const Text('حذف'),
               ),
             ],
           ),
+        ),
+      );
+
+      if (shouldDelete != true || !mounted) return;
+    }
+
+    setState(() => _deletingRecordIds.add(diagnosisId));
+
+    try {
+      final response = await _crud.postRequest(
+        linkAiResultDelete,
+        {'diagnosis_id': diagnosisId.toString()},
+      );
+
+      if (!mounted) return;
+
+      final succeeded =
+          response is Map && response['status']?.toString() == 'success';
+
+      if (!succeeded) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('لم يتم حذف التقرير. تحقق من الاتصال بالخادم وحاول مجدداً.'),
+          ),
         );
-      },
-    );
+        return;
+      }
+
+      setState(() {
+        _records.removeWhere((item) => item.diagnosisId == diagnosisId);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم حذف التقرير بنجاح.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('حدث خطأ أثناء حذف التقرير: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _deletingRecordIds.remove(diagnosisId));
+      }
+    }
   }
 
   Future<void> _openPdf(DiagnosticRecord record) async {
