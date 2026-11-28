@@ -167,7 +167,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           icon: Icons.center_focus_strong_rounded,
                           title: 'إرفاق خريطة Grad-CAM في ملف PDF',
                           description:
-                              'عند التفعيل، ينشئ النظام خريطة تفسير للنموذج المختص ويضيف صورة الأشعة مع الخريطة المركّبة واسم الطبقة إلى التقرير. يتطلب وجود ملف Keras المطابق لكل تخصص، وقد يزيد وقت إنشاء التقرير.',
+                              'عند التفعيل، ينشئ النظام خريطة تفسير للنموذج المختص ويضيف صورة الإدخال مع الخريطة المركّبة واسم الطبقة إلى التقرير. يتطلب ملف Keras المطابق لكل تخصص، ويعمل حالياً على Windows فقط، وقد يزيد وقت إنشاء التقرير.',
                           value: AppPreferences.includeGradCamInPdf,
                           onChanged: (value) => _saveSetting(
                             () => AppPreferences.includeGradCamInPdf = value,
