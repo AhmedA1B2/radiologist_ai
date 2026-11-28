@@ -41,43 +41,53 @@ class _ViewDashboardState extends State<ViewDashboard> {
   bool isLoading = false;
 
   Future<void> getViewRecords() async {
+    if (!mounted) return;
+
+    setState(() => isLoading = true);
+
     try {
-      setState(() {
-        isLoading = true;
-      });
+      final response = await _crud.postRequest(linkAiResultView, {});
 
-      var response = await _crud.postRequest(linkAiResultView, {});
+      if (!mounted) return;
 
-      if (response['status'] == 'success') {
-        final List data = response['data'];
-
-        setState(() {
-          _records.clear();
-
-          for (var item in data) {
-            _records.add(
-              DiagnosticRecord(
-                diagnosisId: int.parse(item['diagnosis_id'].toString()),
-                patientId: int.parse(item['patient_id'].toString()),
-                date: item['date'].toString(),
-                file: item['file'].toString(),
-                image: item['img'].toString(),
-              ),
+      if (response is Map &&
+          response['status']?.toString() == 'success' &&
+          response['data'] is List) {
+        final List<dynamic> data = response['data'] as List<dynamic>;
+        final parsedRecords = data.map((item) {
+          if (item is! Map) {
+            throw const FormatException(
+              'The records response contains an invalid item.',
             );
           }
+
+          return DiagnosticRecord(
+            diagnosisId: int.parse(item['diagnosis_id'].toString()),
+            patientId: int.parse(item['patient_id'].toString()),
+            date: item['date'].toString(),
+            file: item['file'].toString(),
+            image: item['img'].toString(),
+          );
+        }).toList();
+
+        setState(() {
+          _records
+            ..clear()
+            ..addAll(parsedRecords);
         });
       } else {
-        setState(() {
-          _records.clear();
-        });
+        setState(_records.clear);
       }
-    } catch (e) {
-      debugPrint("getViewRecords error ====> $e");
+    } catch (error) {
+      debugPrint('getViewRecords error: $error');
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر تحميل السجلات: $error')),
+      );
     } finally {
       if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
+        setState(() => isLoading = false);
       }
     }
   }
