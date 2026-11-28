@@ -1306,6 +1306,13 @@ class _MainDashboardState extends State<MainDashboard> {
   // ============================================================
 
   Widget _buildResultsPanel() {
+    return ValueListenableBuilder<int>(
+      valueListenable: AppPreferences.revision,
+      builder: (context, revision, child) => _buildResultsPanelContent(),
+    );
+  }
+
+  Widget _buildResultsPanelContent() {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
