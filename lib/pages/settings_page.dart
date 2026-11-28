@@ -37,6 +37,7 @@ class _SettingsPageState extends State<SettingsPage> {
       if (!mounted) return;
       setState(() {
         updateValue(previousValue);
+        AppPreferences.notifyChanged();
         _saving = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
@@ -49,6 +50,8 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _confirmReset() async {
+    if (_saving) return;
+
     final shouldReset = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => Directionality(
@@ -118,6 +121,7 @@ class _SettingsPageState extends State<SettingsPage> {
         AppPreferences.showModelScores = previousValues['showModelScores']!;
         AppPreferences.confirmBeforeDelete =
             previousValues['confirmBeforeDelete']!;
+        AppPreferences.notifyChanged();
         _saving = false;
       });
 
@@ -292,7 +296,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         Align(
                           alignment: Alignment.centerLeft,
                           child: TextButton.icon(
-                            onPressed: _confirmReset,
+                            onPressed: _saving ? null : _confirmReset,
                             icon: const Icon(Icons.refresh_rounded),
                             label: const Text('استعادة الإعدادات الافتراضية'),
                             style: TextButton.styleFrom(
