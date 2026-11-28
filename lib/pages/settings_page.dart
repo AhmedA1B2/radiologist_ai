@@ -91,7 +91,7 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
 
-    if (shouldReset != true) return;
+    if (shouldReset != true || !mounted) return;
 
     final previousValues = <String, bool>{
       'includeXrayImageInPdf': AppPreferences.includeXrayImageInPdf,
