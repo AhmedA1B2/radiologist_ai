@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 /// Centralized application preferences persisted on the current device.
 class AppPreferences {
   AppPreferences._();
@@ -9,6 +11,13 @@ class AppPreferences {
   static bool includeGradCamInPdf = false;
   static bool showModelScores = true;
   static bool confirmBeforeDelete = true;
+
+  /// Notifies screens that render settings-driven UI (for example model scores).
+  static final ValueNotifier<int> revision = ValueNotifier<int>(0);
+
+  static void notifyChanged() {
+    revision.value++;
+  }
 
   // Serialize writes so rapid switches cannot overwrite a newer preference
   // with an older asynchronous file operation.
@@ -91,6 +100,7 @@ class AppPreferences {
   /// Errors are intentionally propagated so the Settings page can notify the
   /// user and restore the previous switch value instead of showing a false save.
   static Future<void> save() {
+    notifyChanged();
     final encoded = const JsonEncoder.withIndent('  ').convert({
       'includeXrayImageInPdf': includeXrayImageInPdf,
       'includeGradCamInPdf': includeGradCamInPdf,
