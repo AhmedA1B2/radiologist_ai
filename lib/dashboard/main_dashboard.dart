@@ -1443,8 +1443,10 @@ class _MainDashboardState extends State<MainDashboard> {
                   ),
 
                   child: Text(
-                    "${_routerResult!.label} "
-                    "(ثقة: ${(_routerResult!.confidence * 100).toStringAsFixed(1)}%)",
+                    AppPreferences.showModelScores
+                        ? "${_routerResult!.label} "
+                            "(ثقة: ${(_routerResult!.confidence * 100).toStringAsFixed(1)}%)"
+                        : _routerResult!.label,
                     style: const TextStyle(
                       color: AppColors.cyanAccent,
                       fontWeight: FontWeight.bold,
@@ -1499,26 +1501,28 @@ class _MainDashboardState extends State<MainDashboard> {
                                     ),
                                   ),
 
-                                  Text(
-                                    "${(result.confidence * 100).toStringAsFixed(1)}%",
-                                    style: const TextStyle(
-                                      color: AppColors.textSecondary,
+                                  if (AppPreferences.showModelScores)
+                                    Text(
+                                      "${(result.confidence * 100).toStringAsFixed(1)}%",
+                                      style: const TextStyle(
+                                        color: AppColors.textSecondary,
+                                      ),
                                     ),
-                                  ),
                                 ],
                               ),
 
-                              const SizedBox(height: 8),
-
-                              LinearProgressIndicator(
-                                value: result.confidence,
-                                backgroundColor: AppColors.navyDark,
-                                color: index == 0
-                                    ? AppColors.cyanAccent
-                                    : Colors.white38,
-                                minHeight: 12,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
+                              if (AppPreferences.showModelScores) ...[
+                                const SizedBox(height: 8),
+                                LinearProgressIndicator(
+                                  value: result.confidence.clamp(0.0, 1.0),
+                                  backgroundColor: AppColors.navyDark,
+                                  color: index == 0
+                                      ? AppColors.cyanAccent
+                                      : Colors.white38,
+                                  minHeight: 12,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ],
                             ],
                           ),
                         );
