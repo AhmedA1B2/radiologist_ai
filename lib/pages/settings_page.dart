@@ -13,16 +13,39 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   bool _saving = false;
 
-  Future<void> _saveSetting(VoidCallback update) async {
+  Future<void> _saveSetting({
+    required bool previousValue,
+    required bool newValue,
+    required ValueChanged<bool> updateValue,
+  }) async {
+    if (_saving || previousValue == newValue) return;
+
     setState(() {
-      update();
+      updateValue(newValue);
       _saving = true;
     });
 
-    await AppPreferences.save();
+    try {
+      await AppPreferences.save();
 
-    if (!mounted) return;
-    setState(() => _saving = false);
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم حفظ الإعداد بنجاح.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        updateValue(previousValue);
+        _saving = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تعذر حفظ الإعداد، تمت إعادة قيمته السابقة. $error'),
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    }
   }
 
   Future<void> _confirmReset() async {
@@ -66,13 +89,45 @@ class _SettingsPageState extends State<SettingsPage> {
 
     if (shouldReset != true) return;
 
+    final previousValues = <String, bool>{
+      'includeXrayImageInPdf': AppPreferences.includeXrayImageInPdf,
+      'includeGradCamInPdf': AppPreferences.includeGradCamInPdf,
+      'showModelScores': AppPreferences.showModelScores,
+      'confirmBeforeDelete': AppPreferences.confirmBeforeDelete,
+    };
+
     setState(() => _saving = true);
-    await AppPreferences.reset();
-    if (!mounted) return;
-    setState(() => _saving = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تمت إعادة الإعدادات إلى القيم الافتراضية.')),
-    );
+    try {
+      await AppPreferences.reset();
+      if (!mounted) return;
+
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تمت إعادة الإعدادات إلى القيم الافتراضية وحفظها.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        AppPreferences.includeXrayImageInPdf =
+            previousValues['includeXrayImageInPdf']!;
+        AppPreferences.includeGradCamInPdf =
+            previousValues['includeGradCamInPdf']!;
+        AppPreferences.showModelScores = previousValues['showModelScores']!;
+        AppPreferences.confirmBeforeDelete =
+            previousValues['confirmBeforeDelete']!;
+        _saving = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تعذرت إعادة ضبط الإعدادات وحفظها: $error'),
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    }
   }
 
   @override
@@ -134,7 +189,7 @@ class _SettingsPageState extends State<SettingsPage> {
                             else
                               IconButton(
                                 tooltip: 'إعادة ضبط الإعدادات',
-                                onPressed: _confirmReset,
+                                onPressed: _saving ? null : _confirmReset,
                                 icon: const Icon(
                                   Icons.restart_alt_rounded,
                                   color: AppColors.cyanAccentDark,
@@ -158,9 +213,15 @@ class _SettingsPageState extends State<SettingsPage> {
                           description:
                               'عند التفعيل، تُضاف صورة الأشعة الأصلية المحددة إلى التقرير المُنشأ.',
                           value: AppPreferences.includeXrayImageInPdf,
-                          onChanged: (value) => _saveSetting(
-                            () => AppPreferences.includeXrayImageInPdf = value,
-                          ),
+                          onChanged: _saving
+                              ? null
+                              : (value) => _saveSetting(
+                                  previousValue:
+                                      AppPreferences.includeXrayImageInPdf,
+                                  newValue: value,
+                                  updateValue: (next) =>
+                                      AppPreferences.includeXrayImageInPdf = next,
+                                ),
                         ),
                         const SizedBox(height: 12),
                         _buildSettingTile(
@@ -169,9 +230,15 @@ class _SettingsPageState extends State<SettingsPage> {
                           description:
                               'عند التفعيل، ينشئ النظام خريطة تفسير للنموذج المختص ويضيف صورة الإدخال مع الخريطة المركّبة واسم الطبقة إلى التقرير. يتطلب ملف Keras المطابق لكل تخصص، ويعمل حالياً على Windows فقط، وقد يزيد وقت إنشاء التقرير.',
                           value: AppPreferences.includeGradCamInPdf,
-                          onChanged: (value) => _saveSetting(
-                            () => AppPreferences.includeGradCamInPdf = value,
-                          ),
+                          onChanged: _saving
+                              ? null
+                              : (value) => _saveSetting(
+                                  previousValue:
+                                      AppPreferences.includeGradCamInPdf,
+                                  newValue: value,
+                                  updateValue: (next) =>
+                                      AppPreferences.includeGradCamInPdf = next,
+                                ),
                         ),
                         const SizedBox(height: 24),
                         _buildSectionTitle(
@@ -186,9 +253,14 @@ class _SettingsPageState extends State<SettingsPage> {
                           description:
                               'يعرض أو يخفي الدرجة الرقمية والمؤشر المرئي بجانب نتائج النموذج في لوحة التحليل. لا يغيّر هذا الخيار محتوى ملف PDF.',
                           value: AppPreferences.showModelScores,
-                          onChanged: (value) => _saveSetting(
-                            () => AppPreferences.showModelScores = value,
-                          ),
+                          onChanged: _saving
+                              ? null
+                              : (value) => _saveSetting(
+                                  previousValue: AppPreferences.showModelScores,
+                                  newValue: value,
+                                  updateValue: (next) =>
+                                      AppPreferences.showModelScores = next,
+                                ),
                         ),
                         const SizedBox(height: 24),
                         _buildSectionTitle(
@@ -203,9 +275,15 @@ class _SettingsPageState extends State<SettingsPage> {
                           description:
                               'عند التفعيل، تظهر نافذة تأكيد قبل إرسال طلب حذف التقرير من السجلات.',
                           value: AppPreferences.confirmBeforeDelete,
-                          onChanged: (value) => _saveSetting(
-                            () => AppPreferences.confirmBeforeDelete = value,
-                          ),
+                          onChanged: _saving
+                              ? null
+                              : (value) => _saveSetting(
+                                  previousValue:
+                                      AppPreferences.confirmBeforeDelete,
+                                  newValue: value,
+                                  updateValue: (next) =>
+                                      AppPreferences.confirmBeforeDelete = next,
+                                ),
                           warning: !AppPreferences.confirmBeforeDelete,
                         ),
                         const SizedBox(height: 24),
