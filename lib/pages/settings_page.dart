@@ -162,6 +162,17 @@ class _SettingsPageState extends State<SettingsPage> {
                             () => AppPreferences.includeXrayImageInPdf = value,
                           ),
                         ),
+                        const SizedBox(height: 12),
+                        _buildSettingTile(
+                          icon: Icons.center_focus_strong_rounded,
+                          title: 'إرفاق خريطة Grad-CAM في ملف PDF',
+                          description:
+                              'عند التفعيل، ينشئ النظام خريطة تفسير للنموذج المختص ويضيف صورة الأشعة مع الخريطة المركّبة واسم الطبقة إلى التقرير. يتطلب وجود ملف Keras المطابق لكل تخصص، وقد يزيد وقت إنشاء التقرير.',
+                          value: AppPreferences.includeGradCamInPdf,
+                          onChanged: (value) => _saveSetting(
+                            () => AppPreferences.includeGradCamInPdf = value,
+                          ),
+                        ),
                         const SizedBox(height: 24),
                         _buildSectionTitle(
                           icon: Icons.analytics_outlined,
