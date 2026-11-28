@@ -863,6 +863,7 @@ class _MainDashboardState extends State<MainDashboard> {
 
                   // 2. إرسال PDF وصورة الأشعة إلى السيرفر
                   final success = await SendDiagnosis().addDiagnosi(
+                    // ignore: use_build_context_synchronously
                     context,
                     numController.text.trim(),
                     DateTime.now().toString(),
@@ -877,6 +878,7 @@ class _MainDashboardState extends State<MainDashboard> {
                       numController.clear();
                     });
 
+                    // ignore: use_build_context_synchronously
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text(
@@ -886,10 +888,12 @@ class _MainDashboardState extends State<MainDashboard> {
                     );
                   }
                 } catch (e) {
+                  // ignore: avoid_print
                   print("Save diagnosis error: $e");
 
                   if (!mounted) return;
 
+                  // ignore: use_build_context_synchronously
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
